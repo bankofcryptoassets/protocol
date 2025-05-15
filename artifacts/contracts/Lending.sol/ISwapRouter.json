@@ -1,7 +1,7 @@
 {
   "_format": "hh-sol-artifact-1",
-  "contractName": "IUniswap",
-  "sourceName": "contracts/Lending.sol",
+  "contractName": "ISwapRouter",
+  "sourceName": "Contracts/Lending.sol",
   "abi": [
     {
       "inputs": [

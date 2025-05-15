@@ -1,24 +1,25 @@
 const mongoose = require("mongoose");
 
 const LendingSchema = new mongoose.Schema({
+  // Core user identification
   user_id: { type: mongoose.Types.ObjectId, required: true, ref: "User" },
   user_address: { type: String, required: true },
-  lending_amount_approved: { type: Number, required: true },
-  lending_duration: { type: Number, required: true }, // timestamp
-  amount_receivable: { type: Number, required: true },
-  interest_rate: { type: Number, required: true },
-  interest: { type: Number, required: true },
-//   principalReceived: { type: Number, defualt: 0 },
-//   interestReceived: { type: Number, defualt: 0 },
-//   totalReceived: { type: Number, defualt: 0 },
-  ifSlashedReceivable: { type: Number },
-//   inUse: { type: Boolean, defualt: false },
-  avaialble_amount: { type: Number, required: true },
-  loans: [{ type: mongoose.Types.ObjectId, required: true, ref: "Loan" }],
-  openedOn: { type: Date, required: true },
-  transaction_hash: { type: String },
+  
+  // Lending details from deposit event
+  lending_amount_approved: { type: String, required: true },
+  available_amount: { type: String, required: true },
+  
+  // Blockchain information
+  transaction_hash: { type: String, required: true },
   chain_id: { type: Number, required: true },
+  
+  // Timestamps
+  openedOn: { type: Date, required: true },
+  
+  // Related loans (can be populated as loans are created)
+  loans: [{ type: mongoose.Types.ObjectId, ref: "Loan" }]
 });
+
 
 const Lend = mongoose.model("Lend", LendingSchema);
 

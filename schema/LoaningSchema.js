@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Lend = require("./LendingSchema");
 
 const BorrowingSchema = new mongoose.Schema({
+  loan_id : { type: String, required: true },
   user_id: { type: mongoose.Types.ObjectId, required: true, ref: "User" },
   user_address: { type: String, required: true },
   loan_amount: { type: Number, required: true },
@@ -63,6 +64,18 @@ const BorrowingSchema = new mongoose.Schema({
   months_not_paid: { type: Number, required: true },
   bounce: { type: Boolean },
   loan_end: { type: Date, required: true },
+  amortization_schedule: [
+    {
+      duePrincipal: { type: Number, required: true },
+      dueInterest: { type: Number, required: true },
+      paid: { type: Boolean, required: true },
+    }
+  ],
+  liquidation_price : { type: Number },
+  is_active: { type: Boolean, required: true },
+  is_liquidated: { type: Boolean, default: false },
+  is_repaid: { type: Boolean, default: false },
+  is_defaulted: { type: Boolean, default: false },
 });
 
 const Loan = mongoose.model("Loan", BorrowingSchema);

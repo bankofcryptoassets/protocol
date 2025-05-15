@@ -1,4 +1,7 @@
 const User = require("../schema/UserSchema");
+const Loan = require("../schema/LoaningSchema");
+const Payment = require("../schema/PaymentSchema");
+const Lend = require("../schema/LendingSchema");
 
 const getAllUsers = async (req, res) => {
   try {
@@ -17,7 +20,7 @@ const getUserById = async (req, res) => {
     }else{
         id = req.params.id;
     }
-    const user = await User.findById(id);
+    const user = await User.findById(id).populate("lends loans payments withdraws");
     return res.json({ user });
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -34,9 +37,58 @@ const updateUser = async (req, res) => {
   }
 };
 
+const getUserDashboard = async (req, res) => {
+  try {
+    const { user_address } = req.query;
+    if (!user_address) return res.status(400).json({ error: "User address is required" });
+
+    const user = await User.findOne({ user_address })
+      .populate({ path: "loans", model: Loan })
+      .populate({ path: "payments", model: Payment })
+      .populate({ path: "lendings", model: Lend });
+
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Calculate totals
+    let totalLent = 0;
+    let totalInterestEarned = 0;
+    let totalReturns = 0;
+    let totalBorrowed = 0;
+
+    for (const lend of user.lendings) {
+      totalLent += lend.amount || 0;
+      totalInterestEarned += lend.received_interest || 0;
+      totalReturns += lend.total_received || 0;
+    }
+
+    for (const loan of user.loans) {
+      totalBorrowed += loan.loan_amount || 0;
+    }
+
+    const dashboard = {
+      user_address: user.user_address,
+      loans: user.loans,
+      lendings: user.lendings,
+      payments: user.payments,
+      stats: {
+        totalLent,
+        totalInterestEarned,
+        totalReturns,
+        totalBorrowed
+      }
+    };
+
+    res.json(dashboard);
+  } catch (err) {
+    console.error("Error in getUserDashboard:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 
 module.exports = {
   getAllUsers,
   getUserById,
   updateUser,
+  getUserDashboard
 };

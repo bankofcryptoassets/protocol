@@ -8,23 +8,25 @@ const PaymentSchema = new mongoose.Schema({
   transaction_hash: { type: String },
   loan_id: { type: mongoose.Types.ObjectId, required: true, ref: "Loan" },
   asset: { type: String, required: true },
-  lenders: [{ type: mongoose.Types.ObjectId, ref: "Lend" }],
-  amount_to_lenders: [
+  distributions: [
     {
-      lend_id: { type: mongoose.Types.ObjectId, ref: "User" },
+      user_address: { type: String },
       amount: { type: Number },
+      interest: { type: Number },
+      total: { type: Number },
     },
   ],
-  interest_to_lenders: {
-    lend_id: { type: mongoose.Types.ObjectId, ref: "User" },
-    amount: { type: Number },
-  },
-  total_to_lenders: {
-    lend_id: { type: mongoose.Types.ObjectId, ref: "User" },
-    amount: { type: Number },
-  },
-  transaction_hash: { type: String },
 });
+
+
+PaymentSchema.methods.calculateTotalDistribution = function() {
+  return this.distributions.reduce((total, distribution) => total + distribution.total, 0);
+};
+
+PaymentSchema.methods.addDistribution = function(userAddress, amount, interest) {
+  const total = amount + interest;
+  this.distributions.push({ user_address: userAddress, amount, interest, total });
+};
 
 const Payment = mongoose.model("Payment", PaymentSchema);
 

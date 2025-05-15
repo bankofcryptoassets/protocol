@@ -1,11 +1,11 @@
 const ethers = require("ethers");
-const { abi } = require("./public/Zeistal02Abi.json");
+const { abi } =  require("./artifacts/Contracts/Lending.sol/LendingPool.json");
 require("dotenv").config();
 
 const provider = new ethers.JsonRpcProvider(
-  "https://rpc.testnet.citrea.xyz"
+  "https://rpc.testnet.citrea.xyz" // change RPC URL
 );
-const contractAddress = "0x96BD2F1AffB134c0d67CfF763Ec33f073cc7F618";
+const contractAddress = "0x96BD2F1AffB134c0d67CfF763Ec33f073cc7F618"; // change 
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
 const contract = new ethers.Contract(contractAddress, abi, wallet);

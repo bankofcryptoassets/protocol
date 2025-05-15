@@ -3,7 +3,6 @@ const express = require("express");
 const cron = require("node-cron");
 
 const { connectDB } = require("./utils/db");
-const { setOraclePrice } = require("./engine/OracleManager");
 const userRouter = require("./routes/userRouter");
 const authRouter = require("./routes/authRouter");
 const loanRouter = require("./routes/loanRouter");
@@ -13,18 +12,17 @@ const loanInitialisationRouter = require("./routes/initialisationRouter");
 
 const { seralizeUser } = require("./controllers/authController");
 const { recordDeposit } = require("./Listeners/deposit");
-const { recordLoan } = require("./Listeners/loan");
-const { recordPayment } = require("./Listeners/payment");
+const { recordLoanEvents } = require("./Listeners/loan");
+const { recordPayoutEvents } = require("./Listeners/payment");
 
 const app = express();
 // connectDB();
 
 // schedule cron for every 5 seconds
 // cron.schedule("*/5 * * * * *", async () => {
-//   await setOraclePrice();
 //   await recordDeposit();
-//   await recordLoan();
-//   await recordPayment();
+//   await recordLoanEvents();
+//   await recordPayoutEvents();
 // });
 
 app.use(express.json());
