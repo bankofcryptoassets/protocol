@@ -66,23 +66,20 @@ contract MockAavePool {
      * @param to The address that will receive the underlying asset
      * @return The actual amount withdrawn
      */
-    function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
-        // Determine available amount (either amount requested or user's total supply)
-        uint256 userSupply = userSupplies[asset][msg.sender];
-        uint256 actualAmount = amount > userSupply ? userSupply : amount;
+        function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
+        // Ensure user has enough balance
+        require(userSupplies[msg.sender][asset] >= amount, "Insufficient balance");
         
-        require(actualAmount > 0, "No funds to withdraw");
+        // Update storage first to prevent reentrancy
+        userSupplies[msg.sender][asset] -= amount;
         
-        // Update balances
-        userSupplies[asset][msg.sender] -= actualAmount;
-        totalSupplies[asset] -= actualAmount;
+        // Transfer the asset to the specified address
+        bool success = IERC20(asset).transfer(to, amount);
+        require(success, "Transfer failed");
         
-        // Transfer the tokens from this contract to the recipient
-        IERC20(asset).transfer(to, actualAmount);
+        emit Withdraw(asset, to, amount);
         
-        emit Withdraw(asset, to, actualAmount);
-        
-        return actualAmount;
+        return amount;  // Return actual amount withdrawn
     }
 
     /**
@@ -155,48 +152,45 @@ contract MockSwapRouter {
      * @param deadline The swap deadline, unused in this mock
      * @return amounts The amounts of tokens swapped
      */
-    function swapExactTokensForTokens(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external returns (uint256[] memory amounts) {
-        require(path.length >= 2, "Invalid path");
-        require(amountIn > 0, "Amount must be greater than 0");
-        
-        // Initialize the amounts array
-        amounts = new uint256[](path.length);
-        amounts[0] = amountIn;
-        
-        // Process each swap in the path
-        for (uint256 i = 0; i < path.length - 1; i++) {
-            address tokenIn = path[i];
-            address tokenOut = path[i + 1];
-            
-            PairRate memory rate = exchangeRates[tokenIn][tokenOut];
-            require(rate.denominator > 0, "Exchange rate not set");
-            
-            // Calculate the output amount based on the exchange rate
-            uint256 amountOut = (amounts[i] * rate.numerator) / rate.denominator;
-            amounts[i + 1] = amountOut;
-            
-            // Transfer input tokens from sender to this contract
-            if (i == 0) {
-                IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
-            }
-            
-            // Transfer output tokens to recipient if this is the final swap
-            if (i == path.length - 2) {
-                require(amountOut >= amountOutMin, "Insufficient output amount");
-                IERC20(tokenOut).transfer(to, amountOut);
-            }
-            
-            emit Swap(tokenIn, tokenOut, amounts[i], amountOut);
+function swapExactTokensForTokens(
+    uint256 amountIn,
+    uint256 amountOutMin,
+    address[] calldata path,
+    address to,
+    uint256 deadline
+) external returns (uint256[] memory amounts) {
+    require(path.length >= 2, "Invalid path");
+    require(amountIn > 0, "Amount must be greater than 0");
+
+    amounts = new uint256[](path.length);
+    amounts[0] = amountIn;
+
+    for (uint256 i = 0; i < path.length - 1; i++) {
+        address tokenIn = path[i];
+        address tokenOut = path[i + 1];
+
+        PairRate memory rate = exchangeRates[tokenIn][tokenOut];
+        require(rate.denominator > 0 && rate.numerator > 0, "Exchange rate not set");
+
+        // Corrected swap math: amountOut = (amountIn * denominator) / numerator
+        uint256 amountOut = (amounts[i] * rate.denominator) / rate.numerator;
+        amounts[i + 1] = amountOut;
+
+        if (i == 0) {
+            IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
         }
-        
-        return amounts;
+
+        if (i == path.length - 2) {
+            require(amountOut >= amountOutMin, "Insufficient output amount");
+            IERC20(tokenOut).transfer(to, amountOut);
+        }
+
+        emit Swap(tokenIn, tokenOut, amounts[i], amountOut);
     }
+
+    return amounts;
+}
+
 
     /**
      * @dev Gets the exchange rate between two tokens
@@ -366,6 +360,10 @@ contract MockBTCPriceOracle {
  * @title MockDeployer
  * @dev Contract to deploy and configure all mock contracts for the LendingPool
  */
+/**
+ * @title MockDeployer
+ * @dev Contract to deploy and configure all mock contracts for the LendingPool
+ */
 contract MockDeployer {
     // Deployed contract addresses
     MockUSDC public usdc;
@@ -376,7 +374,7 @@ contract MockDeployer {
     
     // Constants
     uint256 public constant BTC_USD_PRICE = 103000e8; // $103,000 with 8 decimals
-    uint256 public constant INITIAL_USDC_LIQUIDITY = 25000000e6; // 25 million USDC
+    uint256 public constant INITIAL_USDC_LIQUIDITY = 25000000000e6; // 25 billion USDC
     uint256 public constant INITIAL_BTC_LIQUIDITY = 250e8; // 250 BTC
     
     // Events

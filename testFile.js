@@ -1,197 +1,265 @@
 const { ethers } = require("hardhat");
+const { parseUnits, formatUnits } = ethers;
 
 async function main() {
   console.log("Starting deployment and test script...");
-
-  // Get accounts
+  
+  // Get deployer account
   const [deployer, lender1, lender2, borrower] = await ethers.getSigners();
   console.log(`Deploying with account: ${deployer.address}`);
-  
-  // Deploy MockDeployer contract
+
+  // Deploy MockDeployer
   console.log("Deploying MockDeployer...");
   const MockDeployer = await ethers.getContractFactory("MockDeployer");
   const mockDeployer = await MockDeployer.deploy();
-  console.log(`MockDeployer deployed to: ${mockDeployer.address}`);
-  
-  // Deploy all mock contracts
+  await mockDeployer.waitForDeployment();
+  console.log(`MockDeployer deployed to: ${await mockDeployer.getAddress()}`);
+
+  // Deploy mock contracts
   console.log("Deploying mock contracts...");
-  const deployTx = await mockDeployer.deploy();
-  await deployTx.wait();
+  await mockDeployer.deploy();
   console.log("All mock contracts deployed!");
-  
-  // Initialize contracts with liquidity and settings
+
+  // Initialize mock contracts with liquidity and settings
   console.log("Initializing mock contracts...");
-  const initTx = await mockDeployer.initialize();
-  await initTx.wait();
+  await mockDeployer.initialize();
   console.log("Mock contracts initialized with liquidity and settings!");
-  
-  // Get addresses of all deployed contracts
+
+  // Get mock contract addresses
   const addresses = await mockDeployer.getAddresses();
-  console.log("\nDeployed Contract Addresses:");
+  console.log("Deployed Contract Addresses:");
   console.log("----------------------------");
-  console.log(`USDC:          ${addresses.usdcAddress}`);
-  console.log(`cbBTC:         ${addresses.cbBtcAddress}`);
-  console.log(`AavePool:      ${addresses.aavePoolAddress}`);
-  console.log(`SwapRouter:    ${addresses.swapRouterAddress}`);
-  console.log(`Price Oracle:  ${addresses.priceOracleAddress}`);
+  console.log(`USDC:          ${addresses[0]}`);
+  console.log(`cbBTC:         ${addresses[1]}`);
+  console.log(`AavePool:      ${addresses[2]}`);
+  console.log(`SwapRouter:    ${addresses[3]}`);
+  console.log(`Price Oracle:  ${addresses[4]}`);
+
+  // Get instances of ERC20 tokens first (before minting)
+  const MockUSDC = await ethers.getContractFactory("MockUSDC");
+  const MockCbBTC = await ethers.getContractFactory("MockCbBTC");
+  const usdc = MockUSDC.attach(addresses[0]);
+  const cbBtc = MockCbBTC.attach(addresses[1]);
+
+  // Mint test tokens for the deployer - with enough for later liquidity operations
+  console.log("Minting test tokens for deployer...");
+  await mockDeployer.mintTestTokens(
+    deployer.address,
+    parseUnits("100000000", 6),  // 100M USDC (6 decimals)
+    parseUnits("1000", 8)        // 1000 BTC (8 decimals)
+  );
+  console.log(`Minted 100,000,000 USDC and 1,000 cbBTC for ${deployer.address}`);
   
-  // Mint some test tokens for the deployer
-  console.log("\nMinting test tokens for deployer...");
-  const usdcAmount = ethers.parseUnits("1000000", 6); // 1 million USDC
-  const btcAmount = ethers.parseUnits("10", 8);      // 10 BTC
-  
-  const mintTx = await mockDeployer.mintTestTokens(deployer.address, usdcAmount, btcAmount);
-  await mintTx.wait();
-  console.log(`Minted 1,000,000 USDC and 10 cbBTC for ${deployer.address}`);
-  
-  // Deploy the main LendingPool contract
-  console.log("\nDeploying LendingPool contract...");
+  // Check deployer's balance before proceeding
+  const deployerUsdcBalance = await usdc.balanceOf(deployer.address);
+  const deployerBtcBalance = await cbBtc.balanceOf(deployer.address);
+  console.log(`Deployer USDC balance: ${formatUnits(deployerUsdcBalance, 6)} USDC`);
+  console.log(`Deployer cbBTC balance: ${formatUnits(deployerBtcBalance, 8)} cbBTC`);
+
+  // Deploy the LendingPool contract
+  console.log("Deploying LendingPool contract...");
   const LendingPool = await ethers.getContractFactory("LendingPool");
   const lendingPool = await LendingPool.deploy(
-    addresses.usdcAddress,         // USDC token
-    addresses.cbBtcAddress,        // cbBTC token
-    addresses.priceOracleAddress,  // Price oracle
-    addresses.aavePoolAddress,     // Aave pool
-    addresses.swapRouterAddress    // Swap router
+    addresses[0],  // USDC
+    addresses[1],  // cbBTC
+    addresses[4],  // Oracle
+    addresses[2],  // Aave Pool
+    addresses[3]   // Swap Router
   );
-  
-  // Get the actual address of the deployed lending pool
-  const lendingPoolAddress = lendingPool.target;
-  console.log(`LendingPool deployed to: ${lendingPoolAddress}`);
+  await lendingPool.waitForDeployment();
+  console.log(`LendingPool deployed to: ${await lendingPool.getAddress()}`);
+  console.log("Deployment complete! 🎉");
 
-  console.log("\nDeployment complete! 🎉");
+  // Set up the SwapRouter with higher liquidity
+  const MockSwapRouter = await ethers.getContractFactory("MockSwapRouter");
+  const swapRouter = MockSwapRouter.attach(addresses[3]);
+
+  console.log("-------------- STARTING INTERACTION TESTS --------------");
+
+  // Check if the swap router has enough liquidity
+  const routerUsdcBalance = await usdc.balanceOf(addresses[3]);
+  const routerBtcBalance = await cbBtc.balanceOf(addresses[3]);
+  console.log(`Swap Router USDC balance: ${formatUnits(routerUsdcBalance, 6)} USDC`);
+  console.log(`Swap Router cbBTC balance: ${formatUnits(routerBtcBalance, 8)} cbBTC`);
+
+  // Mint additional test tokens for the test accounts
+  console.log("Minting tokens for test accounts...");
   
-  // --- INTERACTION TESTS ---
-  console.log("\n-------------- STARTING INTERACTION TESTS --------------");
+  // Mint for lenders
+  await mockDeployer.mintTestTokens(lender1.address, parseUnits("100000", 6), 0);
+  await mockDeployer.mintTestTokens(lender2.address, parseUnits("100000", 6), 0);
   
-  // Connect to token contracts
-  const usdc = await ethers.getContractAt("MockUSDC", addresses.usdcAddress);
-  const cbBtc = await ethers.getContractAt("MockCbBTC", addresses.cbBtcAddress);
+  // Mint for borrower
+  await mockDeployer.mintTestTokens(borrower.address, parseUnits("50000", 6),0);
   
-  // 1. Mint tokens for test accounts
-  console.log("\nMinting tokens for test accounts...");
-  
-  // Mint for lenders and borrower
-  const lenderAmount = ethers.parseUnits("100000", 6); // 100,000 USDC
-  const borrowerUsdcAmount = ethers.parseUnits("50000", 6); // 50,000 USDC
-  const borrowerBtcAmount = ethers.parseUnits("1", 8); // 1 BTC
-  
-  await mockDeployer.mintTestTokens(lender1.address, lenderAmount, 0);
-  await mockDeployer.mintTestTokens(lender2.address, lenderAmount, 0);
-  await mockDeployer.mintTestTokens(borrower.address, borrowerUsdcAmount, borrowerBtcAmount);
-  
-  console.log(`Minted 100,000 USDC for each lender`);
-  console.log(`Minted 50,000 USDC and 1 BTC for borrower`);
-  
-  // 2. Check balances
+  console.log("Minted 100,000 USDC for each lender");
+  console.log("Minted 50,000 USDC and 1 BTC for borrower");
+
+  // Check balances
   const lender1Balance = await usdc.balanceOf(lender1.address);
   const lender2Balance = await usdc.balanceOf(lender2.address);
   const borrowerUsdcBalance = await usdc.balanceOf(borrower.address);
   const borrowerBtcBalance = await cbBtc.balanceOf(borrower.address);
+
+  console.log("Current balances:");
+  console.log(`Lender1 USDC: ${formatUnits(lender1Balance, 6)}`);
+  console.log(`Lender2 USDC: ${formatUnits(lender2Balance, 6)}`);
+  console.log(`Borrower USDC: ${formatUnits(borrowerUsdcBalance, 6)}`);
+  console.log(`Borrower cbBTC: ${formatUnits(borrowerBtcBalance, 8)}`);
+
+  // Set up a test loan
+  console.log("Setting up a test loan...");
   
-  console.log("\nCurrent balances:");
-  console.log(`Lender1 USDC: ${ethers.formatUnits(lender1Balance, 6)}`);
-  console.log(`Lender2 USDC: ${ethers.formatUnits(lender2Balance, 6)}`);
-  console.log(`Borrower USDC: ${ethers.formatUnits(borrowerUsdcBalance, 6)}`);
-  console.log(`Borrower cbBTC: ${ethers.formatUnits(borrowerBtcBalance, 8)}`);
+  // Calculate the amount of USDC needed for the loan
+  const loanAmount = parseUnits("50000", 6);  // 50,000 USDC
+  const lender1Amount = parseUnits("20000", 6);  // 20,000 USDC
+  const lender2Amount = parseUnits("20000", 6);  // 20,000 USDC
+  const borrowerDeposit = (loanAmount * 20n) / 100n;  // 20% deposit = 8,000 USDC
   
-  // 3. Create a loan
-  console.log("\nSetting up a test loan...");
+  console.log(`Loan amount: ${formatUnits(loanAmount, 6)} USDC`);
+  console.log(`Borrower deposit: ${formatUnits(borrowerDeposit, 6)} USDC`);
   
-  // First, approve tokens
-  const loanAmount = ethers.parseUnits("50000", 6); // 50,000 USDC loan
-  const lender1Amount = ethers.parseUnits("30000", 6); // 30,000 USDC from lender1
-  const lender2Amount = ethers.parseUnits("20000", 6); // 20,000 USDC from lender2
-  const borrowerDeposit = ethers.parseUnits("10000", 6); // 10,000 USDC deposit (20% of loan)
+  // Transfer more tokens to the swap router to ensure sufficient liquidity
+  console.log("Adding more liquidity to swap router...");
   
+  // Check deployer's balance again before the transfer
+  const currentDeployerUsdcBalance = await usdc.balanceOf(deployer.address);
+  const currentDeployerBtcBalance = await cbBtc.balanceOf(deployer.address);
+  console.log(`Deployer current USDC balance: ${formatUnits(currentDeployerUsdcBalance, 6)} USDC`);
+  console.log(`Deployer current cbBTC balance: ${formatUnits(currentDeployerBtcBalance, 8)} cbBTC`);
+  
+  // Add more liquidity to the swap router - using amounts that we're sure the deployer has
+  const usdcToAdd = parseUnits("10000000", 6); // 10M USDC
+  const btcToAdd = parseUnits("100", 8); // 100 BTC
+  
+  await usdc.connect(deployer).transfer(addresses[3], usdcToAdd);
+  await cbBtc.connect(deployer).transfer(addresses[3], btcToAdd);
+  
+  console.log(`Added ${formatUnits(usdcToAdd, 6)} USDC and ${formatUnits(btcToAdd, 8)} cbBTC to the swap router`);
+  
+  // Check new router balances
+  const newRouterUsdcBalance = await usdc.balanceOf(addresses[3]);
+  const newRouterBtcBalance = await cbBtc.balanceOf(addresses[3]);
+  console.log(`New Swap Router USDC balance: ${formatUnits(newRouterUsdcBalance, 6)} USDC`);
+  console.log(`New Swap Router cbBTC balance: ${formatUnits(newRouterBtcBalance, 8)} cbBTC`);
+  
+  // Approve tokens for the lending pool
+  const lendingPoolAddress = await lendingPool.getAddress();
   console.log(`Approving lendingPool at address: ${lendingPoolAddress}`);
   
-  // Lenders approve LendingPool to spend their USDC
-  const approveTx1 = await usdc.connect(lender1).approve(lendingPoolAddress, lender1Amount);
-  await approveTx1.wait();
-  console.log(`Lender1 approved LendingPool to spend ${ethers.formatUnits(lender1Amount, 6)} USDC`);
-
-  const approveTx2 = await usdc.connect(lender2).approve(lendingPoolAddress, lender2Amount);
-  await approveTx2.wait();
-  console.log(`Lender2 approved LendingPool to spend ${ethers.formatUnits(lender2Amount, 6)} USDC`);
+  await usdc.connect(lender1).approve(lendingPoolAddress, lender1Amount);
+  await usdc.connect(lender2).approve(lendingPoolAddress, lender2Amount);
+  await usdc.connect(borrower).approve(lendingPoolAddress, borrowerDeposit);
   
-  // Borrower approves LendingPool to spend their USDC for deposit
-  const approveTx3 = await usdc.connect(borrower).approve(lendingPoolAddress, borrowerDeposit);
-  await approveTx3.wait();
-  console.log(`Borrower approved LendingPool to spend ${ethers.formatUnits(borrowerDeposit, 6)} USDC`);
+  console.log(`Lender1 approved LendingPool to spend ${formatUnits(lender1Amount, 6)} USDC`);
+  console.log(`Lender2 approved LendingPool to spend ${formatUnits(lender2Amount, 6)} USDC`);
+  console.log(`Borrower approved LendingPool to spend ${formatUnits(borrowerDeposit, 6)} USDC`);
+  
+  // Check allowances to verify approvals
+  const lender1Allowance = await usdc.allowance(lender1.address, lendingPoolAddress);
+  const lender2Allowance = await usdc.allowance(lender2.address, lendingPoolAddress);
+  const borrowerAllowance = await usdc.allowance(borrower.address, lendingPoolAddress);
   
   console.log("Checking allowances to verify approvals:");
-  const allowance1 = await usdc.allowance(lender1.address, lendingPoolAddress);
-  const allowance2 = await usdc.allowance(lender2.address, lendingPoolAddress);
-  const allowance3 = await usdc.allowance(borrower.address, lendingPoolAddress);
-  
-  console.log(`Lender1 allowance: ${ethers.formatUnits(allowance1, 6)} USDC`);
-  console.log(`Lender2 allowance: ${ethers.formatUnits(allowance2, 6)} USDC`);
-  console.log(`Borrower allowance: ${ethers.formatUnits(allowance3, 6)} USDC`);
+  console.log(`Lender1 allowance: ${formatUnits(lender1Allowance, 6)} USDC`);
+  console.log(`Lender2 allowance: ${formatUnits(lender2Allowance, 6)} USDC`);
+  console.log(`Borrower allowance: ${formatUnits(borrowerAllowance, 6)} USDC`);
   
   // Create the loan
   console.log("Creating loan...");
-  const loanTx = await lendingPool.connect(borrower).loan(
-    loanAmount,                      // Total loan amount
-    12,                             // 12 months duration
-    10,                              // 10% annual interest rate
-    [lender1.address, lender2.address],  // Lenders
-    [lender1Amount, lender2Amount]       // Lender contributions
+  const tx = await lendingPool.connect(borrower).loan(
+    loanAmount,                             // Total loan amount (40,000 USDC)
+    12,                                     // 12 months duration
+    10,                                     // 10% annual interest rate
+    [lender1.address, lender2.address],     // Lender addresses
+    [lender1Amount, lender2Amount]          // Lender amounts
   );
   
-  const receipt = await loanTx.wait();
+  await tx.wait();
+  console.log("Loan created successfully!");
+
+  // Get loan details
+  const latestBlock = await ethers.provider.getBlock('latest');
+  const loanId = ethers.keccak256(
+    ethers.solidityPacked(
+      ["address", "uint256"],
+      [borrower.address, latestBlock.timestamp]
+    )
+  );
   
-  // Find the LoanCreated event to get the loan ID
-  const loanCreatedEvent = receipt.events.find(event => event.event === "LoanCreated");
-  const loanId = loanCreatedEvent.args.id;
+  console.log(`Generated loan ID: ${loanId}`);
   
-  console.log(`Loan created with ID: ${loanId}`);
-  console.log(`Loan amount: 50,000 USDC`);
-  console.log(`Borrower deposit: 10,000 USDC`);
-  console.log(`Duration: 12 months`);
-  console.log(`Interest rate: 10% annual`);
+  // Check updated balances
+  const updatedLender1Balance = await usdc.balanceOf(lender1.address);
+  const updatedLender2Balance = await usdc.balanceOf(lender2.address);
+  const updatedBorrowerUsdcBalance = await usdc.balanceOf(borrower.address);
   
-  // 4. Get loan details and amortization schedule
-  const loanDetails = await lendingPool.loans(loanId);
-  const schedule = await lendingPool.getInstallmentSchedule(loanId);
+  console.log("Updated balances after loan creation:");
+  console.log(`Lender1 USDC: ${formatUnits(updatedLender1Balance, 6)}`);
+  console.log(`Lender2 USDC: ${formatUnits(updatedLender2Balance, 6)}`);
+  console.log(`Borrower USDC: ${formatUnits(updatedBorrowerUsdcBalance, 6)}`);
+
+  const MockAavePool = await ethers.getContractFactory("MockAavePool");
+  const aavePool = MockAavePool.attach(addresses[2]);
+
+  const staked = await aavePool.getUserSupply(addresses[1], lendingPoolAddress);
+  console.log(`Staked cbBTC in Aave by LendingPool: ${ethers.formatUnits(staked, 8)} cbBTC`); 
   
-  console.log("\nLoan details:");
-  console.log(`Borrower: ${loanDetails.borrower}`);
-  console.log(`Principal: ${ethers.formatUnits(loanDetails.principal, 6)} USDC`);
-  console.log(`Monthly payment: ${ethers.formatUnits(loanDetails.monthlyPayment, 6)} USDC`);
-  console.log(`Start time: ${new Date(Number(loanDetails.startTime) * 1000).toLocaleString()}`);
-  console.log(`Is active: ${loanDetails.isActive}`);
+  console.log("Test completed successfully! 🎉");
+
+  console.log("---------- STARTING REPAYMENT TEST ----------");
+
+  const lpBalanceBefore = await usdc.balanceOf(lendingPoolAddress);
+  console.log("LendingPool USDC balance before payout:", formatUnits(lpBalanceBefore, 6));
+
+
+// Approve repayment
+const repaymentAmount = parseUnits("10000", 6); // First repayment
+await usdc.connect(borrower).approve(lendingPoolAddress, repaymentAmount);
+console.log(`Borrower approved ${formatUnits(repaymentAmount, 6)} USDC for repayment`);
+
+const allowance = await usdc.allowance(borrower.address, lendingPoolAddress);
+console.log(`Borrower allowance: ${formatUnits(allowance, 6)} USDC`);
+
+const borrowerBalance = await usdc.balanceOf(borrower.address);
+console.log(`Borrower balance: ${formatUnits(borrowerBalance, 6)} USDC`);
+
+const debug = await lendingPool.debugUnstakeCalc(loanId, parseUnits("8333.3333", 6)); // principal repaid in this payout
+console.log(`Proportion repaid: ${ethers.formatUnits(debug[0], 18)} (1.0 = fully repaid)`);
+console.log(`cbBTC to unstake: ${ethers.formatUnits(debug[1], 8)} cbBTC`);
+
+let stakedBefore = await lendingPool.getStakedAmount(loanId);
+console.log(`Staked amount before repayment: ${ethers.formatUnits(stakedBefore, 8)} cbBTC`);
+
+// Call payouts
+const payoutTx = await lendingPool.connect(borrower).payouts(loanId, repaymentAmount);
   
-  console.log("\nAmortization schedule (first 3 months):");
-  for (let i = 0; i < Math.min(3, schedule.length); i++) {
-    const payment = schedule[i];
-    console.log(`Month ${i+1}:`);
-    console.log(`  Principal: ${ethers.formatUnits(payment.duePrincipal, 6)} USDC`);
-    console.log(`  Interest: ${ethers.formatUnits(payment.dueInterest, 6)} USDC`);
-    console.log(`  Due date: ${new Date(Number(payment.dueTimestamp) * 1000).toLocaleString()}`);
-    console.log(`  Paid: ${payment.paid}`);
-  }
-  
-  console.log("\nTest interaction complete! 🎉");
-  
-  // Return all deployed addresses for verification
-  return {
-    mockDeployer: mockDeployer.address,
-    usdc: addresses.usdcAddress,
-    cbBtc: addresses.cbBtcAddress,
-    aavePool: addresses.aavePoolAddress,
-    swapRouter: addresses.swapRouterAddress,
-    priceOracle: addresses.priceOracleAddress,
-    lendingPool: lendingPoolAddress,
-  };
+await payoutTx.wait();
+console.log(`Borrower repaid ${formatUnits(repaymentAmount, 6)} USDC for loan ${loanId}`);
+
+let stakedAfter = await lendingPool.getStakedAmount(loanId);
+console.log(`Staked amount after repayment: ${ethers.formatUnits(stakedAfter, 8)} cbBTC`);
+
+// Check balances after payout
+const lender1Post = await usdc.balanceOf(lender1.address);
+const lender2Post = await usdc.balanceOf(lender2.address);
+const borrowerPost = await usdc.balanceOf(borrower.address);
+const borrowerBtcPost = await cbBtc.balanceOf(borrower.address);
+
+console.log("Balances after repayment:");
+console.log(`Lender1: ${formatUnits(lender1Post, 6)} USDC`);
+console.log(`Lender2: ${formatUnits(lender2Post, 6)} USDC`);
+console.log(`Borrower: ${formatUnits(borrowerPost, 6)} USDC`);
+console.log(`Borrower cbBTC: ${formatUnits(borrowerBtcPost, 8)} cbBTC`);
+
+// Check cbBTC still staked
+const remainingStake = await aavePool.getUserSupply(addresses[1], lendingPoolAddress);
+console.log(`Remaining cbBTC in Aave for LendingPool: ${formatUnits(remainingStake, 8)} cbBTC`);
+
 }
 
-// Execute main function
 main()
-  .then(() => {
-    console.log("\nDeployment and testing successful!");
-    process.exit(0);
-  })
+  .then(() => process.exit(0))
   .catch((error) => {
     console.error("Deployment or testing failed:", error);
     process.exit(1);

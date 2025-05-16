@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 // AAVE Interfaces
@@ -21,6 +21,8 @@ interface ISwapRouter {
 }
 
 contract LendingPool {
+    using SafeERC20 for IERC20;
+
     // AAVE and Swap contracts
     IAavePool public aavePool;
     ISwapRouter public swapRouter;
@@ -58,6 +60,7 @@ contract LendingPool {
         uint256 startTime;
         uint256 btcPriceAtCreation;
         bool isActive;
+        uint256 totalAmount;      // Total amount of the loan
         LenderContribution[] contributions;
         Installment[] amortizationSchedule;
         uint256 stakedAmount;     // Amount of cbBTC staked in AAVE
@@ -79,6 +82,13 @@ contract LendingPool {
     event InstallmentPaid(bytes32 loanId, uint256 index);
     event TokensStaked(bytes32 loanId, uint256 usdcAmount, uint256 cbBtcAmount);
     event TokensUnstaked(bytes32 loanId, uint256 cbBtcAmount, uint256 usdcAmount, uint256 borrowerCbBtcShare);
+
+event DebugUnstakeProportion(
+    bytes32 loanId,
+    uint256 principalRepaid,
+    uint256 proportionRepaid,
+    uint256 cbBtcToUnstake
+);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner can call this function");
@@ -125,7 +135,7 @@ contract LendingPool {
         Loan storage newLoan = loans[loanId];
         
         // Swap USDC to cbBTC
-        uint256 cbBtcAmount = _swapUsdcToCbBtc(newLoan.principal);
+        uint256 cbBtcAmount = _swapUsdcToCbBtc(newLoan.totalAmount);
         
         // Stake cbBTC to AAVE
         _stakeCbBtcToAave(loanId, cbBtcAmount);
@@ -133,28 +143,34 @@ contract LendingPool {
         emit LoanCreated(loanId, totalAmount, newLoan.borrowerDeposit, msg.sender);
     }
     
-    function _swapUsdcToCbBtc(uint256 usdcAmount) internal returns (uint256) {
-        // Approve swap router to spend USDC
-        IERC20(usdcToken).approve(address(swapRouter), usdcAmount);
-        
-        // Create the token path for the swap
-        address[] memory path = new address[](2);
-        path[0] = usdcToken;
-        path[1] = cbBtcToken;
-        
-        // Execute the swap with a minimum acceptable amount (this should be calculated based on price impact)
-        uint256 amountOutMin = usdcAmount * 95 / 100; // 5% slippage as placeholder
-        
-        uint256[] memory amounts = swapRouter.swapExactTokensForTokens(
-            usdcAmount,
-            amountOutMin,
-            path,
-            address(this),
-            block.timestamp + 300 // 5 minutes deadline
-        );
-        
-        return amounts[1]; // Return the amount of cbBTC received
-    }
+function _swapUsdcToCbBtc(uint256 usdcAmount) internal returns (uint256) {
+    IERC20(usdcToken).approve(address(swapRouter), usdcAmount);
+
+    address[] memory path = new address[](2);
+    path[0] = usdcToken;
+    path[1] = cbBtcToken;
+
+    // Fetch latest BTC price from Chainlink-like oracle (e.g., 103000 * 10^8)
+    (, int256 price,,,) = chainlinkOracle.latestRoundData();
+    require(price > 0, "Invalid price");
+
+    // Compute how much cbBTC we expect: cbBTC = USDC * 10^8 / (BTC price in 10^8)
+    uint256 expectedCbBtc = (usdcAmount * 1e8) / uint256(price);
+
+    // Apply 2% slippage buffer
+    uint256 amountOutMin = (expectedCbBtc * 98) / 100;
+
+    uint256[] memory amounts = swapRouter.swapExactTokensForTokens(
+        usdcAmount,
+        amountOutMin,
+        path,
+        address(this),
+        block.timestamp + 300
+    );
+
+    return amounts[1];
+}
+  
     
     function _stakeCbBtcToAave(bytes32 loanId, uint256 cbBtcAmount) internal {
         Loan storage loan = loans[loanId];
@@ -189,6 +205,7 @@ contract LendingPool {
         Loan storage newLoan = loans[loanId];
         newLoan.id = loanId;
         newLoan.borrower = msg.sender;
+        newLoan.totalAmount = totalAmount;
         newLoan.principal = lenderPrincipal;
         newLoan.borrowerDeposit = borrowerDeposit;
         newLoan.interestRate = annualInterestRate;
@@ -283,121 +300,99 @@ contract LendingPool {
         emit InstallmentPaid(loanId, index);
     }
 
-    function payouts(bytes32 loanId, uint256 usdcAmount) external {
-        Loan storage loan = loans[loanId];
-        require(loan.isActive, "Loan is not active");
-        require(msg.sender == loan.borrower, "Only borrower can repay");
+function payouts(bytes32 loanId, uint256 usdcAmount) external {
+    Loan storage loan = loans[loanId];
+    require(loan.isActive, "Loan is not active");
+    require(msg.sender == loan.borrower, "Only borrower can repay");
 
-        // Transfer USDC from borrower to this contract
-        IERC20(usdcToken).transferFrom(msg.sender, address(this), usdcAmount);
+    // ✅ Ensure this is here!
+    IERC20(usdcToken).transferFrom(msg.sender, address(this), usdcAmount);
 
-        // Get current BTC price in USDC (e.g., 1 BTC = 50,000 * 1e6 USDC if USDC has 6 decimals)
-        uint256 btcPrice = loan.btcPriceAtCreation;
-        require(btcPrice > 0, "Invalid BTC price");
+    uint256 remainingPayment = usdcAmount;
+    uint256 totalPrincipalRepaid = 0;
 
-        // Convert USDC to BTC (ensure same decimal scaling)
-        uint256 btcEquivalent = (usdcAmount * 1e18) / uint256(btcPrice);
+    for (uint256 i = 0; i < loan.amortizationSchedule.length && remainingPayment > 0; i++) {
+        Installment storage installment = loan.amortizationSchedule[i];
+        if (installment.paid) continue;
 
-        uint256 remainingBtcPayment = btcEquivalent;
-        uint256 totalPrincipalRepaid = 0;
+        uint256 installmentTotal = installment.duePrincipal + installment.dueInterest;
 
-        // Apply payment to amortization schedule
-        for (uint256 i = 0; i < loan.amortizationSchedule.length && remainingBtcPayment > 0; i++) {
-            Installment storage installment = loan.amortizationSchedule[i];
-            if (installment.paid) continue;
+        if (remainingPayment >= installmentTotal) {
+            remainingPayment -= installmentTotal;
+            totalPrincipalRepaid += installment.duePrincipal;
 
-            uint256 installmentTotal = installment.duePrincipal + installment.dueInterest;
+            distributePaymentToLenders(loan, installment.duePrincipal, installment.dueInterest);
+            installment.paid = true;
 
-            if (remainingBtcPayment >= installmentTotal) {
-                // Full installment payment
-                installment.paid = true;
-                remainingBtcPayment -= installmentTotal;
-                totalPrincipalRepaid += installment.duePrincipal;
-
-                // Distribute principal + interest to lenders
-                distributePaymentToLenders(loan, installment.duePrincipal, installment.dueInterest);
-
-                emit InstallmentPaid(loanId, i);
-            } else {
-                // Partial payment not yet supported
-                break;
-            }
-        }
-
-        // Update remaining principal on the loan
-        loan.remainingPrincipal -= totalPrincipalRepaid;
-
-        // Unstake from AAVE based on principal repaid
-        if (totalPrincipalRepaid > 0) {
-            _unstakeProportionalAmount(loanId, totalPrincipalRepaid);
-            _updateLiquidationThreshold(loanId);
-        }
-
-        // Check if loan is now fully repaid
-        bool fullyRepaid = true;
-        for (uint256 i = 0; i < loan.amortizationSchedule.length; i++) {
-            if (!loan.amortizationSchedule[i].paid) {
-                fullyRepaid = false;
-                break;
-            }
-        }
-
-        if (fullyRepaid) {
-            loan.isActive = false;
-            hasActiveLoan[loan.borrower] = false;
-
-            // Unstake any remaining amount from AAVE
-            if (loan.stakedAmount > 0) {
-                _unstakeFromAave(loanId, loan.stakedAmount, false);
-            }
-        }
-
-        emit Payout(loanId, msg.sender, usdcAmount, fullyRepaid);
-    }
-
-    function _unstakeProportionalAmount(bytes32 loanId, uint256 principalRepaid) internal {
-        Loan storage loan = loans[loanId];
-        
-        // Calculate what proportion of the initial principal has been repaid in this transaction
-        uint256 proportionRepaid = (principalRepaid * 1e18) / loan.principal;
-        
-        // Calculate how much cbBTC to unstake
-        uint256 cbBtcToUnstake = (loan.stakedAmount * proportionRepaid) / 1e18;
-        
-        if (cbBtcToUnstake > 0) {
-            _unstakeFromAave(loanId, cbBtcToUnstake, true);
+            emit InstallmentPaid(loanId, i);
         }
     }
-    
+
+    _unstakeProportionalAmount(loanId, totalPrincipalRepaid);
+
+    emit Payout(loanId, msg.sender, usdcAmount - remainingPayment, remainingPayment == 0);
+}
+
+
     function _unstakeFromAave(bytes32 loanId, uint256 cbBtcAmount, bool returnToBorrower) internal {
-        Loan storage loan = loans[loanId];
-        require(cbBtcAmount <= loan.stakedAmount, "Cannot unstake more than staked amount");
-        
-        // Withdraw cbBTC from AAVE
-        uint256 actualWithdrawn = aavePool.withdraw(cbBtcToken, cbBtcAmount, address(this));
-        
-        // Update staked amount
-        loan.stakedAmount -= actualWithdrawn;
-        
-        if (returnToBorrower) {
-            // Return a percentage of cbBTC to borrower (25% as a placeholder - this can be adjusted)
-            uint256 borrowerShare = actualWithdrawn * 25 / 100;
-            uint256 contractShare = actualWithdrawn - borrowerShare;
-            
-            // Transfer borrower's share of cbBTC directly to them
-            IERC20(cbBtcToken).transfer(loan.borrower, borrowerShare);
-            
-            // Swap contract's share of cbBTC to USDC 
-            uint256 usdcReceived = _swapCbBtcToUsdc(contractShare);
-            
-            emit TokensUnstaked(loanId, actualWithdrawn, usdcReceived, borrowerShare);
-        } else {
-            // Swap all cbBTC back to USDC (for liquidations or full repayments)
-            uint256 usdcReceived = _swapCbBtcToUsdc(actualWithdrawn);
-            
-            emit TokensUnstaked(loanId, actualWithdrawn, usdcReceived, 0);
-        }
+    Loan storage loan = loans[loanId];
+    require(cbBtcAmount <= loan.stakedAmount, "Cannot unstake more than staked amount");
+    require(cbBtcAmount > 0, "Cannot unstake zero amount");
+
+    // Debug balance check before withdrawal
+    uint256 preBalance = IERC20(cbBtcToken).balanceOf(address(this));
+    
+    // Withdraw from Aave pool to LendingPool
+    uint256 actualWithdrawn = aavePool.withdraw(cbBtcToken, cbBtcAmount, address(this));
+    
+    // Debug balance check after withdrawal
+    uint256 postBalance = IERC20(cbBtcToken).balanceOf(address(this));
+    
+    // Verify withdrawal actually increased our balance
+    require(postBalance > preBalance, "Withdrawal didn't increase balance");
+    require(actualWithdrawn > 0, "Unstake returned zero tokens");
+
+    // Update internal state
+    loan.stakedAmount -= actualWithdrawn;
+
+    // If borrower is to receive the tokens back
+    if (returnToBorrower) {
+        bool success = IERC20(cbBtcToken).transfer(loan.borrower, actualWithdrawn);
+        require(success, "Transfer to borrower failed");
+
+        emit TokensUnstaked(loanId, cbBtcAmount, 0, actualWithdrawn);
+    } else {
+        // Optional fallback
+        uint256 usdcReceived = _swapCbBtcToUsdc(actualWithdrawn);
+        emit TokensUnstaked(loanId, cbBtcAmount, usdcReceived, 0);
     }
+}
+
+// 2. Add a debug event to track withdrawal success
+event DebugUnstake(bytes32 loanId, uint256 requested, uint256 actualWithdrawn, uint256 preBalance, uint256 postBalance);
+
+// 3. Modify the _unstakeProportionalAmount function to add debugging
+function _unstakeProportionalAmount(bytes32 loanId, uint256 principalRepaid) internal {
+    Loan storage loan = loans[loanId];
+
+    if (principalRepaid == 0 || loan.principal == 0) return;
+
+    // Calculate proportion of loan repaid
+    uint256 proportionRepaid = (principalRepaid * 1e18) / loan.principal;
+
+    // Calculate how much cbBTC to unstake
+    uint256 cbBtcToUnstake = (loan.stakedAmount * proportionRepaid) / 1e18;
+    
+    // Ensure we're not trying to unstake 0
+    require(cbBtcToUnstake > 0, "Amount to unstake is zero");
+
+    _unstakeFromAave(loanId, cbBtcToUnstake, true);
+
+    emit DebugUnstakeProportion(loanId, principalRepaid, proportionRepaid, cbBtcToUnstake);
+}
+
+
+
     
     function _swapCbBtcToUsdc(uint256 cbBtcAmount) internal returns (uint256) {
         // Approve swap router to spend cbBTC
@@ -573,4 +568,21 @@ contract LendingPool {
     function setCbBtcToken(address _cbBtcToken) external onlyOwner {
         cbBtcToken = _cbBtcToken;
     }
+
+    function debugUnstakeCalc(bytes32 loanId, uint256 principalRepaid) external view returns (
+    uint256 proportionRepaid,
+    uint256 cbBtcToUnstake
+) {
+    Loan storage loan = loans[loanId];
+    if (loan.principal == 0) return (0, 0);
+
+    proportionRepaid = (principalRepaid * 1e18) / loan.principal;
+    cbBtcToUnstake = (loan.stakedAmount * proportionRepaid) / 1e18;
+    return (proportionRepaid, cbBtcToUnstake);
+}
+
+function getStakedAmount(bytes32 loanId) external view returns (uint256) {
+    return loans[loanId].stakedAmount;
+}
+
 }
