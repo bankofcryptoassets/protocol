@@ -66,10 +66,7 @@ contract MockAavePool {
      * @param to The address that will receive the underlying asset
      * @return The actual amount withdrawn
      */
-        function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
-        // Ensure user has enough balance
-        require(userSupplies[msg.sender][asset] >= amount, "Insufficient balance");
-        
+        function withdraw(address asset, uint256 amount, address to) external returns (uint256) {        
         // Update storage first to prevent reentrancy
         userSupplies[msg.sender][asset] -= amount;
         

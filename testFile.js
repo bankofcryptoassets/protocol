@@ -1,4 +1,5 @@
 const { ethers } = require("hardhat");
+const { set } = require("mongoose");
 const { parseUnits, formatUnits } = ethers;
 
 async function main() {
@@ -209,6 +210,13 @@ async function main() {
 
   console.log("---------- STARTING REPAYMENT TEST ----------");
 
+  const [principals, interests, paidStatuses] = await lendingPool.getAmortizationSchedule(loanId);
+    console.log("Amortization schedule:");
+    console.log("Principals:", principals.map(p => ethers.formatUnits(p, 6)));
+    console.log("Interests:", interests.map(i => ethers.formatUnits(i, 6)));
+    console.log("Paid statuses:", paidStatuses.map(s => s.toString()));
+  console.log("Loan ID:", loanId);
+
   const lpBalanceBefore = await usdc.balanceOf(lendingPoolAddress);
   console.log("LendingPool USDC balance before payout:", formatUnits(lpBalanceBefore, 6));
 
@@ -235,6 +243,7 @@ console.log(`Staked amount before repayment: ${ethers.formatUnits(stakedBefore, 
 const payoutTx = await lendingPool.connect(borrower).payouts(loanId, repaymentAmount);
   
 await payoutTx.wait();
+
 console.log(`Borrower repaid ${formatUnits(repaymentAmount, 6)} USDC for loan ${loanId}`);
 
 let stakedAfter = await lendingPool.getStakedAmount(loanId);
@@ -245,12 +254,14 @@ const lender1Post = await usdc.balanceOf(lender1.address);
 const lender2Post = await usdc.balanceOf(lender2.address);
 const borrowerPost = await usdc.balanceOf(borrower.address);
 const borrowerBtcPost = await cbBtc.balanceOf(borrower.address);
+const lendingPoolPost = await cbBtc.balanceOf(lendingPoolAddress);
 
 console.log("Balances after repayment:");
 console.log(`Lender1: ${formatUnits(lender1Post, 6)} USDC`);
 console.log(`Lender2: ${formatUnits(lender2Post, 6)} USDC`);
 console.log(`Borrower: ${formatUnits(borrowerPost, 6)} USDC`);
 console.log(`Borrower cbBTC: ${formatUnits(borrowerBtcPost, 8)} cbBTC`);
+console.log(`LendingPool cbBTC: ${formatUnits(lendingPoolPost, 8)} cbBTC`);
 
 // Check cbBTC still staked
 const remainingStake = await aavePool.getUserSupply(addresses[1], lendingPoolAddress);

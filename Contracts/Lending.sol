@@ -260,31 +260,42 @@ function _swapUsdcToCbBtc(uint256 usdcAmount) internal returns (uint256) {
         return loanId;
     }
     
-    function _createAmortizationSchedule(bytes32 loanId, uint256 principal, uint256 monthlyRate, uint256 months) internal {
-        Loan storage loan = loans[loanId];
-        uint256 remainingPrincipal = principal;
-        uint256 payment = loan.monthlyPayment;
-        
-        for (uint256 m = 0; m < months; m++) {
-            uint256 interest = (remainingPrincipal * monthlyRate) / 1e18;
-            uint256 principalPortion = payment - interest;
-            
-            // Handle final payment to ensure full repayment
-            if (m == months - 1) {
-                principalPortion = remainingPrincipal;
-                payment = principalPortion + interest;
-            }
-            
-            loan.amortizationSchedule.push(Installment({
-                duePrincipal: principalPortion,
-                dueInterest: interest,
-                paid: false,
-                dueTimestamp: block.timestamp + (m * 30 days) // Assuming monthly payments
-            }));
-            
-            remainingPrincipal -= principalPortion;
+    function _createAmortizationSchedule(
+    bytes32 loanId,
+    uint256 principal,
+    uint256 monthlyRate, // e.g. 0.008333 * 1e18
+    uint256 months
+) internal {
+    Loan storage loan = loans[loanId];
+
+    uint256 remainingPrincipal = principal;
+
+    // Calculate monthly payment using amortized formula
+    uint256 ratePow = _pow((1e18 + monthlyRate), months); // (1 + r)^n
+    uint256 payment = (principal * monthlyRate * ratePow) / (ratePow - 1e18) / 1e18;
+
+    loan.monthlyPayment = payment;
+
+    for (uint256 m = 0; m < months; m++) {
+        uint256 interest = (remainingPrincipal * monthlyRate) / 1e18;
+        uint256 principalPortion = payment > interest ? payment - interest : 0;
+
+        // Final adjustment to ensure exact payoff
+        if (m == months - 1) {
+            principalPortion = remainingPrincipal;
+            payment = principalPortion + interest;
         }
+
+        loan.amortizationSchedule.push(Installment({
+            duePrincipal: principalPortion,
+            dueInterest: interest,
+            paid: false,
+            dueTimestamp: block.timestamp + (m * 30 days)
+        }));
+
+        remainingPrincipal -= principalPortion;
     }
+}
 
     function getInstallmentSchedule(bytes32 loanId) external view returns (Installment[] memory) {
         return loans[loanId].amortizationSchedule;
@@ -313,6 +324,7 @@ function payouts(bytes32 loanId, uint256 usdcAmount) external {
 
     for (uint256 i = 0; i < loan.amortizationSchedule.length && remainingPayment > 0; i++) {
         Installment storage installment = loan.amortizationSchedule[i];
+        require(installment.duePrincipal > 0, "Installment already paid");
         if (installment.paid) continue;
 
         uint256 installmentTotal = installment.duePrincipal + installment.dueInterest;
@@ -335,6 +347,7 @@ function payouts(bytes32 loanId, uint256 usdcAmount) external {
 
 
     function _unstakeFromAave(bytes32 loanId, uint256 cbBtcAmount, bool returnToBorrower) internal {
+
     Loan storage loan = loans[loanId];
     require(cbBtcAmount <= loan.stakedAmount, "Cannot unstake more than staked amount");
     require(cbBtcAmount > 0, "Cannot unstake zero amount");
@@ -343,7 +356,7 @@ function payouts(bytes32 loanId, uint256 usdcAmount) external {
     uint256 preBalance = IERC20(cbBtcToken).balanceOf(address(this));
     
     // Withdraw from Aave pool to LendingPool
-    uint256 actualWithdrawn = aavePool.withdraw(cbBtcToken, cbBtcAmount, address(this));
+    uint256 actualWithdrawn = aavePool.withdraw(cbBtcToken, cbBtcAmount, loan.borrower);
     
     // Debug balance check after withdrawal
     uint256 postBalance = IERC20(cbBtcToken).balanceOf(address(this));
@@ -372,28 +385,28 @@ function payouts(bytes32 loanId, uint256 usdcAmount) external {
 event DebugUnstake(bytes32 loanId, uint256 requested, uint256 actualWithdrawn, uint256 preBalance, uint256 postBalance);
 
 // 3. Modify the _unstakeProportionalAmount function to add debugging
-function _unstakeProportionalAmount(bytes32 loanId, uint256 principalRepaid) internal {
+
+function _unstakeProportionalAmount(bytes32 loanId, uint256 usdcAmount) internal {
     Loan storage loan = loans[loanId];
+    if (usdcAmount == 0 || loan.btcPriceAtCreation == 0 || loan.stakedAmount == 0) return;
 
-    if (principalRepaid == 0 || loan.principal == 0) return;
+    // Convert USDC (6 decimals) to BTC (8 decimals)
+    // To avoid overflow, we'll multiply first by 1e8 (to get to BTC's 8 decimals) 
+    // and then divide by the BTC price
+    uint256 cbBtcToUnstake = (usdcAmount * 1e8) / loan.btcPriceAtCreation;
 
-    // Calculate proportion of loan repaid
-    uint256 proportionRepaid = (principalRepaid * 1e18) / loan.principal;
+    // Cap to what is staked
+    if (cbBtcToUnstake > loan.stakedAmount) {
+        cbBtcToUnstake = loan.stakedAmount;
+    }
 
-    // Calculate how much cbBTC to unstake
-    uint256 cbBtcToUnstake = (loan.stakedAmount * proportionRepaid) / 1e18;
-    
-    // Ensure we're not trying to unstake 0
-    require(cbBtcToUnstake > 0, "Amount to unstake is zero");
-
-    _unstakeFromAave(loanId, cbBtcToUnstake, true);
-
-    emit DebugUnstakeProportion(loanId, principalRepaid, proportionRepaid, cbBtcToUnstake);
+    if (cbBtcToUnstake > 0) {
+        _unstakeFromAave(loanId, cbBtcToUnstake, true);
+        loan.stakedAmount -= cbBtcToUnstake;
+    }
 }
 
 
-
-    
     function _swapCbBtcToUsdc(uint256 cbBtcAmount) internal returns (uint256) {
         // Approve swap router to spend cbBTC
         IERC20(cbBtcToken).approve(address(swapRouter), cbBtcAmount);
@@ -584,5 +597,34 @@ function _unstakeProportionalAmount(bytes32 loanId, uint256 principalRepaid) int
 function getStakedAmount(bytes32 loanId) external view returns (uint256) {
     return loans[loanId].stakedAmount;
 }
+
+function getAmortizationSchedule(bytes32 loanId) external view returns (
+    uint256[] memory principals,
+    uint256[] memory interests,
+    bool[] memory paidStatuses
+) {
+    Loan storage loan = loans[loanId];
+    uint256 length = loan.amortizationSchedule.length;
+
+    principals = new uint256[](length);
+    interests = new uint256[](length);
+    paidStatuses = new bool[](length);
+
+    for (uint256 i = 0; i < length; i++) {
+        Installment storage installment = loan.amortizationSchedule[i];
+        principals[i] = installment.duePrincipal;
+        interests[i] = installment.dueInterest;
+        paidStatuses[i] = installment.paid;
+    }
+}
+
+function _pow(uint256 base, uint256 exp) internal pure returns (uint256 result) {
+    result = 1e18;
+    for (uint256 i = 0; i < exp; i++) {
+        result = (result * base) / 1e18;
+    }
+}
+
+
 
 }
