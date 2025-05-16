@@ -19,7 +19,7 @@ The LendingPool contract is a decentralized lending and borrowing platform that 
 
 ### For Borrowers
 
-#### `loan(uint256 totalAmount, uint256 durationMonths, uint256 annualInterestRate)`
+#### `loan(uuint256 totalAmount, uint256 durationMonths, uint256 annualInterestRate, address[] calldata lenderAddresses, uint256[] calldata lenderAmounts)`
 
 Creates a new loan, collects the borrower's deposit, and distributes funds from lenders.
 
@@ -27,6 +27,8 @@ Creates a new loan, collects the borrower's deposit, and distributes funds from 
 - `totalAmount`: Total loan amount including borrower deposit (in USDC)
 - `durationMonths`: Loan duration in months
 - `annualInterestRate`: Annual interest rate (in percentage points, e.g., 5 for 5%)
+- `lenderAddresses`: Array of lender addresses
+- `lenderAmounts`: Array of amounts corresponding to each lender's contribution (in USDC)
 
 **Requirements:**
 - Loan amount must be greater than 0
@@ -48,7 +50,8 @@ Creates a new loan, collects the borrower's deposit, and distributes funds from 
 await usdcToken.approve(lendingPoolAddress, ethers.utils.parseUnits("200", 6));
 
 // Create a 1000 USDC loan for 12 months at 5% interest
-await lendingPool.loan(ethers.utils.parseUnits("1000", 6), 12, 5);
+await lendingPool.loan(ethers.utils.parseUnits("1000", 6), 12, 5, lenderAddresses, lenderAmounts);
+
 ```
 
 **Events:**

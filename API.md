@@ -72,6 +72,42 @@ This API provides access to a decentralized lending and borrowing platform. It a
 
 ## 💸 Loan Routes
 
+### `POST /api/loan/match` *(Protected)*
+**Description:** Match a loan with lenders. This is called when a user wants to borrow, ideally after the borrower makes a approval transaction, call this API to get the lenders list with the amount details.
+
+**Body:**
+
+```json
+      "borrower_address": "0x123...",
+      "interest_rate": 8.0,
+      "duration_months": 12,
+      "loan_amount": 1000,
+```
+
+**Returns:**
+
+```json
+{
+   "success": true,
+   "message": "Lenders matched successfully",
+   "data": {
+      "matched_lenders": [
+         {
+            "lender_id": "lender_1",
+            "user_address": "0xabc...",
+            "amount": 500,
+         },
+         {
+            "lender_id": "lender_2",
+            "user_address": "0xdef...",
+            "amount": 500,
+         }
+      ],
+      "total_amount_matched": 1000,
+   }
+}
+```
+
 ### `GET /api/loan` *(Protected)*
 
 **Description:** Get all loans of the current user.
@@ -172,6 +208,35 @@ This API provides access to a decentralized lending and borrowing platform. It a
 ---
 
 ## 🤝 Lending Routes
+
+### `POST /api/lending` *(Protected)*
+
+**Description:** Create a new allowance record. To be called when a user wants to lend, which is approves allowance, after doing the transaction.
+
+**Body:**
+
+```json
+{
+   "user_id": "user_id",
+   "user_address": "user_address",
+   "allowance_amount": "allowance_amount",
+   "duration_preference": "duration_preference"
+}
+```
+**Returns:**
+
+
+```json
+{
+  "message": "Allowance created/updated successfully",
+  "allowance": {
+        "user_id": "user_id",
+        "user_address": "user_address",
+        "allowance_amount": "allowance_amount",
+        "duration_preference": "duration_preference"
+      }
+}
+```
 
 ### `GET /api/lending` *(Protected)*
 
