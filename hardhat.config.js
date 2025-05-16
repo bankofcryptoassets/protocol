@@ -13,10 +13,9 @@ module.exports = {
       viaIR: true, // Use the IR pipeline
     },
   },
-  // networks: {
-  //   citrea: {
-  //     url: "https://rpc.citrea.network",
-  //     chainId: 5115,
-  //   },
-  // },
+  networks: {
+    hardhat: {
+      chainId: 1337,
+    },
+  },
 };

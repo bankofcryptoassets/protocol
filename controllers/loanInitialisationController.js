@@ -1,3 +1,4 @@
+const Lend = require("../schema/LendingSchema");
 const { zeistalContract } = require("../utils/contracts");
 const { getUSDRate, getBTCRate } = require("../utils/getPrice");
 const ethers = require("ethers");
@@ -116,7 +117,12 @@ exports.LoanAvailability = async(req,res) => {
     // Check the amount of USD available in contract -> Use a price feed to convert USD to BTC -> Return the amount of BTC available for loan
     let availableLoanAmountInBTC;
     try{
-        const contractBalance = await zeistalContract.poolBalance();
+        const allowances = await Lend.find();
+
+        const contractBalance = allowances.reduce((acc, allowance) => {
+            return acc + parseFloat(allowance.available_amount);
+        }
+        , 0);
         console.log("Contract Balance:", contractBalance);
         const parsedContractBalance = parseFloat(ethers.formatUnits(contractBalance, 6));
         const btcAmount = await getUSDRate(parsedContractBalance);
@@ -125,6 +131,10 @@ exports.LoanAvailability = async(req,res) => {
         availableLoanAmountInBTC = availableLoanAmount.toFixed(2);
     } catch (error) {
         console.log("Error fetching contract balance:", error);
+        availableLoanAmountInBTC = 1;
+    }
+
+    if(availableLoanAmountInBTC === 0) {
         availableLoanAmountInBTC = 1;
     }
 

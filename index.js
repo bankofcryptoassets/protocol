@@ -17,7 +17,7 @@ const { recordPayoutEvents } = require("./Listeners/payment");
 const { runAutoPayout } = require("./engine/autoPayCron");
 
 const app = express();
-// connectDB();
+connectDB();
 
 // schedule cron for every 5 seconds
 // cron.schedule("*/5 * * * * *", async () => {
