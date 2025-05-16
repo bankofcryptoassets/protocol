@@ -21,7 +21,9 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.10.0",
     "mongoose": "^8.8.0",
-    "node-cron": "^3.0.3"
+    "node-cron": "^3.0.3",
+    "siwe": "^3.0.0",
+    "viem": "^2.29.4"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

@@ -130,15 +130,7 @@ To get current price of USD in BTC
 
 Users must authenticate before accessing other endpoints.
 
-**Endpoint:** `GET /api/auth/nonce`
-
-**Request Body:**
-
-```json
-{
-  "address": "0x1234567890abcdef1234567890abcdef12345678"
-}
-```
+**Endpoint:** `GET /api/auth/nonce?address=0x1234567890abcdef1234567890abcdef12345678`
 
 **Response:**
 
@@ -149,15 +141,12 @@ Users must authenticate before accessing other endpoints.
 }
 ```
 
-**Endpoint:** `POST /api/auth/verify`
+**Endpoint:** `POST /api/auth/verify?signature=your-signature`
 
 **Request Body:**
 
-```json
-{
-  "tempToken": "your-temp-auth-token",
-  "signature": "your-signature"
-}
+```text
+Auth Header : Bearer your-temp-auth-token
 ```
 
 **Response:**
