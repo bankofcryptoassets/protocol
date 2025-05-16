@@ -6,8 +6,8 @@ This API provides access to a decentralized lending and borrowing platform. It a
 
 ## 📋 Table of Contents
 
-* [User Routes](#user-routes)
-* [Loan Routes](#loan-routes)
+* [User Routes](#-user-routes)
+* [Loan Routes](#-loan-routes)
 * [Lending Routes](#lending-routes)
 * [Payment Routes](#payment-routes)
 * [Loan Tools](#loan-tools)
@@ -233,9 +233,9 @@ This API provides access to a decentralized lending and borrowing platform. It a
 
 ```json
 {
-  "amount": 0.5,
+  "amount": 1,
   "term": 12,
-  "interestRate": 8.5
+  "interestRate": 7
 }
 ```
 
@@ -246,28 +246,168 @@ This API provides access to a decentralized lending and borrowing platform. It a
   "status": "success",
   "data": {
     "loanSummary": {
-      "loanAmount": 24000,
-      "downPayment": "4800.00",
-      "openingFee": "192.00",
-      "upfrontPayment": "4992.00",
-      "principal": "19200.00",
-      "monthlyPayment": "1674.56",
-      "totalInterest": "828.76",
-      "totalPayment": "20094.76",
-      "apr": "8.88",
-      "interestRate": 8.5,
+      "loanAmount": 103405.764,
+      "downPayment": "20681.15",
+      "openingFee": "827.25",
+      "upfrontPayment": "21508.40",
+      "principal": "82724.61",
+      "monthlyPayment": "7157.89",
+      "totalInterest": "3170.09",
+      "totalPayment": "85894.70",
+      "apr": "7.00",
+      "interestRate": 7,
       "term": 12,
       "amortizationSchedule": [
-        { "month": 1, "interestPayment": "136.00", "principalPayment": "1538.56", "remainingBalance": "17661.44" },
-        ...
+        {
+          "month": 1,
+          "interestPayment": "482.56",
+          "principalPayment": "6675.33",
+          "remainingBalance": "76049.28",
+          "btcRedeemed": "0.06455473",
+          "remainingBtcCollateral": "0.93544527",
+          "liquidationPrice": "81297.41"
+        },
+        {
+          "month": 2,
+          "interestPayment": "443.62",
+          "principalPayment": "6714.27",
+          "remainingBalance": "69335.01",
+          "btcRedeemed": "0.06493130",
+          "remainingBtcCollateral": "0.87051397",
+          "liquidationPrice": "79648.36"
+        },
+        {
+          "month": 3,
+          "interestPayment": "404.45",
+          "principalPayment": "6753.44",
+          "remainingBalance": "62581.57",
+          "btcRedeemed": "0.06531007",
+          "remainingBtcCollateral": "0.80520390",
+          "liquidationPrice": "77721.40"
+        },
+        {
+          "month": 4,
+          "interestPayment": "365.06",
+          "principalPayment": "6792.83",
+          "remainingBalance": "55788.74",
+          "btcRedeemed": "0.06569104",
+          "remainingBtcCollateral": "0.73951286",
+          "liquidationPrice": "75439.85"
+        },
+        {
+          "month": 5,
+          "interestPayment": "325.43",
+          "principalPayment": "6832.46",
+          "remainingBalance": "48956.28",
+          "btcRedeemed": "0.06607424",
+          "remainingBtcCollateral": "0.67343863",
+          "liquidationPrice": "72695.98"
+        },
+        {
+          "month": 6,
+          "interestPayment": "285.58",
+          "principalPayment": "6872.31",
+          "remainingBalance": "42083.97",
+          "btcRedeemed": "0.06645967",
+          "remainingBtcCollateral": "0.60697895",
+          "liquidationPrice": "69333.49"
+        },
+        {
+          "month": 7,
+          "interestPayment": "245.49",
+          "principalPayment": "6912.40",
+          "remainingBalance": "35171.57",
+          "btcRedeemed": "0.06684735",
+          "remainingBtcCollateral": "0.54013160",
+          "liquidationPrice": "65116.66"
+        },
+        {
+          "month": 8,
+          "interestPayment": "205.17",
+          "principalPayment": "6952.72",
+          "remainingBalance": "28218.84",
+          "btcRedeemed": "0.06723730",
+          "remainingBtcCollateral": "0.47289431",
+          "liquidationPrice": "59672.62"
+        },
+        {
+          "month": 9,
+          "interestPayment": "164.61",
+          "principalPayment": "6993.28",
+          "remainingBalance": "21225.56",
+          "btcRedeemed": "0.06762951",
+          "remainingBtcCollateral": "0.40526479",
+          "liquidationPrice": "52374.55"
+        },
+        {
+          "month": 10,
+          "interestPayment": "123.82",
+          "principalPayment": "7034.08",
+          "remainingBalance": "14191.49",
+          "btcRedeemed": "0.06802402",
+          "remainingBtcCollateral": "0.33724077",
+          "liquidationPrice": "42081.17"
+        },
+        {
+          "month": 11,
+          "interestPayment": "82.78",
+          "principalPayment": "7075.11",
+          "remainingBalance": "7116.38",
+          "btcRedeemed": "0.06842083",
+          "remainingBtcCollateral": "0.26881995",
+          "liquidationPrice": "26472.66"
+        },
+        {
+          "month": 12,
+          "interestPayment": "41.51",
+          "principalPayment": "7116.38",
+          "remainingBalance": "0.00",
+          "btcRedeemed": "0.06881995",
+          "remainingBtcCollateral": "0.20000000",
+          "liquidationPrice": "0.00"
+        }
       ],
       "firstTransaction": {
-        "amountSent": "4992.00",
+        "amountSent": "21508.40",
         "breakdown": {
-          "downPayment": "4800.00",
-          "loanOpeningFee": "192.00"
+          "downPayment": "20681.15",
+          "loanOpeningFee": "827.25"
         }
-      }
+      },
+      "liquidationChart": {
+        "months": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12
+        ],
+        "liquidationPrices": [
+          82724.61,
+          81297.41,
+          79648.36,
+          77721.4,
+          75439.85,
+          72695.98,
+          69333.49,
+          65116.66,
+          59672.62,
+          52374.55,
+          42081.17,
+          26472.66,
+          0
+        ]
+      },
+      "initialBtcCollateral": "1.00000000",
+      "currentBtcPrice": "103405.76"
     }
   }
 }

@@ -15,49 +15,7 @@ The LendingPool contract is a decentralized lending and borrowing platform that 
 
 ## Core Functions
 
-### For Lenders
-
-#### `deposit(uint256 amount)`
-
-Deposits USDC into the lending pool to be used for loans.
-
-**Parameters:**
-- `amount`: The amount of USDC to deposit (in USDC units with 6 decimals)
-
-**Requirements:**
-- Amount must be greater than 0
-- User must have approved the contract to spend their USDC
-
-**Example:**
-```javascript
-// First approve the contract to spend USDC
-await usdcToken.approve(lendingPoolAddress, ethers.utils.parseUnits("1000", 6));
-
-// Then deposit 1000 USDC
-await lendingPool.deposit(ethers.utils.parseUnits("1000", 6));
-```
-
 **Events:**
-- Emits a `Deposit` event with the lender's address and amount
-
-#### `withdraw(uint256 amount)`
-
-Withdraws USDC from the lending pool that hasn't been allocated to loans.
-
-**Parameters:**
-- `amount`: The amount of USDC to withdraw (in USDC units with 6 decimals)
-
-**Requirements:**
-- User must have sufficient unallocated funds in the pool
-
-**Example:**
-```javascript
-// Withdraw 500 USDC
-await lendingPool.withdraw(ethers.utils.parseUnits("500", 6));
-```
-
-**Events:**
-- Emits a `Withdraw` event with the lender's address and amount
 
 ### For Borrowers
 

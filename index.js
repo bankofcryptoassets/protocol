@@ -14,6 +14,7 @@ const { seralizeUser } = require("./controllers/authController");
 const { recordDeposit } = require("./Listeners/deposit");
 const { recordLoanEvents } = require("./Listeners/loan");
 const { recordPayoutEvents } = require("./Listeners/payment");
+const { runAutoPayout } = require("./engine/autoPayCron");
 
 const app = express();
 // connectDB();
@@ -23,6 +24,7 @@ const app = express();
 //   await recordDeposit();
 //   await recordLoanEvents();
 //   await recordPayoutEvents();
+//   await runAutoPayout();
 // });
 
 app.use(express.json());

@@ -1,7 +1,10 @@
+const { ethers, toBigInt } = require("ethers");
 const { manageLiquidity } = require("../engine/liquidityManager");
+const Lend = require("../schema/LendingSchema");
 const Loan = require("../schema/LoaningSchema");
 const User = require("../schema/UserSchema");
 const { getLiquidity } = require("../utils/getLiquidity");
+const { matchLendersForLoan } = require("../utils/matchlenders");
 
 // const createLoan = async (req, res) => {
 //   console.log(req.body);
@@ -121,8 +124,61 @@ const initialDetails = async (req, res) => {
   }
 };
 
+
+const matchLenders = async(req,res) => {
+  try{
+    const {
+      loan_amount,
+      borrower_address,
+      interest_rate,
+      duration_months,
+    } = req.body;
+
+    const loanAmountBN = toBigInt(loan_amount);
+    const availableAllowances = await Lend.find({
+      user_address: { $ne: borrower_address.toLowerCase() }, // Exclude borrower
+      lending_amount_approved: { $gt: "0" }
+    }).sort({ lending_amount_approved: -1 }); 
+
+    if (availableAllowances.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No available lenders found'
+      });
+    }
+
+    const matchResult = matchLendersForLoan(
+      availableAllowances,
+      loanAmountBN,
+      interest_rate,
+      duration_months
+    );
+
+    if (!matchResult.success) {
+      return res.status(404).json({
+        success: false,
+        message: 'Not enough liquidity available to fund this loan'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Lenders matched successfully',
+      data: {
+        matched_lenders: matchResult.lenders,
+        total_amount_matched: matchResult.totalMatched
+      }
+    });
+
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
 module.exports = {
   getLoans,
   getLoanById,
   initialDetails,
+  matchLenders
 };

@@ -8,14 +8,12 @@ const LendingSchema = new mongoose.Schema({
   // Lending details from deposit event
   lending_amount_approved: { type: String, required: true },
   available_amount: { type: String, required: true },
-  
-  // Blockchain information
-  transaction_hash: { type: String, required: true },
-  chain_id: { type: Number, required: true },
-  
+    
   // Timestamps
   openedOn: { type: Date, required: true },
+  duration_preference: { type: String, required: true },
   
+  updated_at: { type: Date, default: Date.now },
   // Related loans (can be populated as loans are created)
   loans: [{ type: mongoose.Types.ObjectId, ref: "Loan" }]
 });

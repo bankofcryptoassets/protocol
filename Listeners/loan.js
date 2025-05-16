@@ -2,6 +2,7 @@
 const { contract, provider } = require("../constants");
 const Loan = require("../schema/LoaningSchema");
 const User = require("../schema/UserSchema");
+const Lend = require("../schema/LendingSchema"); // Import the allowance schema
 
 /**
  * Records loan creation events from the blockchain and updates the database
@@ -166,6 +167,8 @@ const processLoanCreatedEvent = async (event) => {
       asset: "BTC"
     };
     await user.save();
+
+    await updateAllowancesAfterLoan(id, contributions);
     
     console.log(`Loan ${id} saved to database`);
   } catch (error) {
@@ -212,6 +215,51 @@ const processInstallmentPaidEvent = async (event) => {
     console.log(`Updated loan ${loanId} payment info`);
   } catch (error) {
     console.error(`Error processing installment paid event:`, error);
+  }
+};
+
+
+const updateAllowancesAfterLoan = async (loanId, contributions) => {
+  try {
+    
+    console.log(`Updating allowances for loan ${loanId} with ${contributions.length} lenders`);
+    
+    // Update each lender's available allowance
+    for (const contribution of contributions) {
+      const lenderAddress = contribution.lender;
+      const contributionAmount = contribution.amount;
+      
+      // Find the lender's allowance
+      const allowance = await Lend.findOne({
+        user_address: lenderAddress.toLowerCase(),
+      });
+      
+      console.log(`Updating allowance for lender ${lenderAddress}, contribution: ${contributionAmount}`);
+      
+      // Calculate new available amount
+      const currentAvailable = BigInt(allowance.available_amount);
+      const contributionAmountBigInt = BigInt(contributionAmount);
+      
+      if (currentAvailable < contributionAmountBigInt) {
+        console.error(`Lender ${lenderAddress} has insufficient allowance: available=${currentAvailable}, required=${contributionAmountBigInt}`);
+        continue;
+      }
+      
+      const newAvailable = currentAvailable - contributionAmountBigInt;
+      
+      // Update allowance
+      allowance.available_amount = Number(newAvailable);
+      allowance.loans.push(loanId);
+      allowance.updated_at = new Date();
+      
+      await allowance.save();
+      
+      console.log(`Updated allowance for lender ${lenderAddress}, new available: ${newAvailable}`);
+    }
+    
+    console.log(`Finished updating allowances for loan ${loanId}`);
+  } catch (error) {
+    console.error("Error updating allowances after loan:", error);
   }
 };
 

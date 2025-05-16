@@ -66,7 +66,56 @@ const getLendingById = async (req, res) => {
 //   }
 // };
 
+const createAllowance = async(req,res) => {
+  try {
+    const {
+      user_id,
+      user_address,
+      allowance_amount,
+      duration_preference
+    } = req.body;
+
+    const existingLending = await Lend.findOne({ user_address });
+    if(existingLending){
+        // Update existing allowance
+        existingLending.lending_amount_approved += allowance_amount;
+        existingLending.available_amount += allowance_amount;
+        existingLending.updated_at = Date.now();
+        
+       existingLending.duration_preference = duration_preference;
+        
+        await existingLending.save();
+    
+    }else{
+        // Create new allowance
+        const newLending = await Lend.create({
+          user_id,
+          user_address,
+          lending_amount_approved: allowance_amount,
+          available_amount: allowance_amount,
+          duration_preference
+        });
+    
+        await newLending.save();
+    }
+
+    return res.status(200).json({
+      message: "Allowance created/updated successfully",
+      allowance: {
+        user_id,
+        user_address,
+        allowance_amount,
+        duration_preference
+      }
+    });
+
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+}
+
 module.exports = {
   getLendings,
   getLendingById,
+  createAllowance,
 };

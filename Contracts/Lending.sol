@@ -26,14 +26,10 @@ contract LendingPool {
     ISwapRouter public swapRouter;
     address public cbBtcToken;
     
-    // Instead of hardcoding, allow setting this in constructor or via a setter function
     AggregatorV3Interface public chainlinkOracle;
 
     struct Lender {
-        uint256 deposit;
-        uint256 totalContributed;
-        uint256 remainingDeposit;
-        uint256 depositTimestamp;
+        uint256 totalContributed;  // Track total contributions for reporting
     }
 
     struct LenderContribution {
@@ -48,9 +44,10 @@ contract LendingPool {
         uint256 duePrincipal;
         uint256 dueInterest;
         bool paid;
+        uint256 dueTimestamp; 
     }
 
-    struct  Loan {
+    struct Loan {
         bytes32 id;
         address borrower;
         uint256 principal;
@@ -70,15 +67,12 @@ contract LendingPool {
     mapping(address => Lender) public lenders;
     mapping(bytes32 => Loan) public loans;
     mapping(address => bool) public hasActiveLoan;
-    address[] public lendersList;
     bytes32[] public loanIds;
 
     address public owner;
     address public usdcToken;
 
     // Events
-    event Deposit(address indexed lender, uint256 amount);
-    event Withdraw(address indexed lender, uint256 amount);
     event LoanCreated(bytes32 id, uint256 amount, uint256 collateral, address borrower);
     event LoanLiquidated(bytes32 id, address borrower, uint256 btcPriceNow);
     event Payout(bytes32 loanId, address borrower, uint256 amount, bool fullyRepaid);
@@ -111,39 +105,23 @@ contract LendingPool {
         return answer;
     }
 
-    function deposit(uint256 amount) external {
-        require(amount > 0, "Invalid amount");
-        IERC20(usdcToken).transferFrom(msg.sender, address(this), amount);
-
-        if (lenders[msg.sender].deposit == 0) {
-            lendersList.push(msg.sender);
-        }
-
-        lenders[msg.sender].deposit += amount;
-        lenders[msg.sender].remainingDeposit += amount;
-        lenders[msg.sender].depositTimestamp = block.timestamp; 
-
-        // add a deposit event listener
-        emit Deposit(msg.sender, amount);
-    }
-
-    function withdraw(uint256 amount) external {
-        require(lenders[msg.sender].remainingDeposit >= amount, "Insufficient balance");
-        lenders[msg.sender].remainingDeposit -= amount;
-        lenders[msg.sender].deposit -= amount;
-        IERC20(usdcToken).transfer(msg.sender, amount);
-        emit Withdraw(msg.sender, amount);
-    }
-
-    function loan(uint256 totalAmount, uint256 durationMonths, uint256 annualInterestRate) external {
+    function loan(
+        uint256 totalAmount, 
+        uint256 durationMonths, 
+        uint256 annualInterestRate, 
+        address[] calldata lenderAddresses, 
+        uint256[] calldata lenderAmounts
+    ) external {
         require(totalAmount > 0, "Invalid amount");
         require(durationMonths > 0, "Invalid duration");
         require(!hasActiveLoan[msg.sender], "Borrower already has an active loan");
+        require(lenderAddresses.length == lenderAmounts.length, "Lender addresses and amounts length mismatch");
+        require(lenderAddresses.length > 0, "No lenders provided");
 
         // Create loan and collect deposit
-        bytes32 loanId = _createLoan(totalAmount, durationMonths, annualInterestRate);
+        bytes32 loanId = _createLoan(totalAmount, durationMonths, annualInterestRate, lenderAddresses, lenderAmounts);
         
-        // Transfer the loan amount to the borrower
+        // Loan is created, now transfer the loan amount to the borrower
         Loan storage newLoan = loans[loanId];
         
         // Swap USDC to cbBTC
@@ -193,16 +171,20 @@ contract LendingPool {
         emit TokensStaked(loanId, loan.principal, cbBtcAmount);
     }
     
-    function _createLoan(uint256 totalAmount, uint256 durationMonths, uint256 annualInterestRate) internal returns (bytes32) {
+    function _createLoan(
+        uint256 totalAmount, 
+        uint256 durationMonths, 
+        uint256 annualInterestRate,
+        address[] calldata lenderAddresses,
+        uint256[] calldata lenderAmounts
+    ) internal returns (bytes32) {
         uint256 borrowerDeposit = (totalAmount * 20) / 100;
         uint256 lenderPrincipal = totalAmount - borrowerDeposit;
 
+        // Transfer the borrower's deposit
         IERC20(usdcToken).transferFrom(msg.sender, address(this), borrowerDeposit);
 
-        address[] memory sortedLenders = getSortedLenders();
-        uint256 collected = 0;
-        
-        // Create loan ID early to avoid stack too deep issues
+        // Create loan ID
         bytes32 loanId = keccak256(abi.encodePacked(msg.sender, block.timestamp));
         Loan storage newLoan = loans[loanId];
         newLoan.id = loanId;
@@ -216,32 +198,37 @@ contract LendingPool {
         newLoan.isActive = true;
         newLoan.remainingPrincipal = lenderPrincipal;
         
-        // Collect funds from lenders
-        for (uint256 i = 0; i < sortedLenders.length && collected < lenderPrincipal; i++) {
-            address lender = sortedLenders[i];
-            uint256 available = lenders[lender].remainingDeposit;
-            if (available == 0) continue;
-
-            uint256 takeAmount = lenderPrincipal - collected < available ? lenderPrincipal - collected : available;
-            if (takeAmount == 0) continue;
-
-            lenders[lender].remainingDeposit -= takeAmount;
-            lenders[lender].totalContributed += takeAmount;
-            collected += takeAmount;
-
-            uint256 interestReceivable = (takeAmount * annualInterestRate * durationMonths) / (12 * 100);
-
-            // Add contribution directly to storage
+        // Collect funds from the provided lenders
+        uint256 collected = 0;
+        
+        for (uint256 i = 0; i < lenderAddresses.length; i++) {
+            address lender = lenderAddresses[i];
+            uint256 amount = lenderAmounts[i];
+            
+            require(amount > 0, "Invalid lender amount");
+            
+            // Transfer funds from lender to contract
+            IERC20(usdcToken).transferFrom(lender, address(this), amount);
+            
+            collected += amount;
+            
+            // Update lender's total contributed
+            lenders[lender].totalContributed += amount;
+            
+            // Calculate interest for this lender
+            uint256 interestReceivable = (amount * annualInterestRate * durationMonths) / (12 * 100);
+            
+            // Add contribution to loan
             newLoan.contributions.push(LenderContribution({
                 lender: lender,
-                amount: takeAmount,
+                amount: amount,
                 receivableInterest: interestReceivable,
                 repaidPrincipal: 0,
                 repaidInterest: 0
             }));
         }
-
-        require(collected == lenderPrincipal, "Not enough lender funds");
+        
+        require(collected == lenderPrincipal, "Collected amount doesn't match principal");
 
         // Calculate monthly payment
         uint256 monthlyRate = (annualInterestRate * 1e18) / (12 * 100);
@@ -274,7 +261,8 @@ contract LendingPool {
             loan.amortizationSchedule.push(Installment({
                 duePrincipal: principalPortion,
                 dueInterest: interest,
-                paid: false
+                paid: false,
+                dueTimestamp: block.timestamp + (m * 30 days) // Assuming monthly payments
             }));
             
             remainingPrincipal -= principalPortion;
@@ -295,101 +283,77 @@ contract LendingPool {
         emit InstallmentPaid(loanId, index);
     }
 
-    // More efficient sorting using insertion sort instead of bubble sort
-    function getSortedLenders() internal view returns (address[] memory) {
-        address[] memory sorted = new address[](lendersList.length);
-        
-        for (uint256 i = 0; i < lendersList.length; i++) {
-            sorted[i] = lendersList[i];
-        }
-        
-        for (uint256 i = 1; i < sorted.length; i++) {
-            address key = sorted[i];
-            uint256 keyTimestamp = lenders[key].depositTimestamp;
-            int j = int(i) - 1;
-            
-            while (j >= 0 && lenders[sorted[uint(j)]].depositTimestamp > keyTimestamp) {
-                sorted[uint(j + 1)] = sorted[uint(j)];
-                j--;
+    function payouts(bytes32 loanId, uint256 usdcAmount) external {
+        Loan storage loan = loans[loanId];
+        require(loan.isActive, "Loan is not active");
+        require(msg.sender == loan.borrower, "Only borrower can repay");
+
+        // Transfer USDC from borrower to this contract
+        IERC20(usdcToken).transferFrom(msg.sender, address(this), usdcAmount);
+
+        // Get current BTC price in USDC (e.g., 1 BTC = 50,000 * 1e6 USDC if USDC has 6 decimals)
+        uint256 btcPrice = loan.btcPriceAtCreation;
+        require(btcPrice > 0, "Invalid BTC price");
+
+        // Convert USDC to BTC (ensure same decimal scaling)
+        uint256 btcEquivalent = (usdcAmount * 1e18) / uint256(btcPrice);
+
+        uint256 remainingBtcPayment = btcEquivalent;
+        uint256 totalPrincipalRepaid = 0;
+
+        // Apply payment to amortization schedule
+        for (uint256 i = 0; i < loan.amortizationSchedule.length && remainingBtcPayment > 0; i++) {
+            Installment storage installment = loan.amortizationSchedule[i];
+            if (installment.paid) continue;
+
+            uint256 installmentTotal = installment.duePrincipal + installment.dueInterest;
+
+            if (remainingBtcPayment >= installmentTotal) {
+                // Full installment payment
+                installment.paid = true;
+                remainingBtcPayment -= installmentTotal;
+                totalPrincipalRepaid += installment.duePrincipal;
+
+                // Distribute principal + interest to lenders
+                distributePaymentToLenders(loan, installment.duePrincipal, installment.dueInterest);
+
+                emit InstallmentPaid(loanId, i);
+            } else {
+                // Partial payment not yet supported
+                break;
             }
-            
-            sorted[uint(j + 1)] = key;
         }
-        
-        return sorted;
-    }
 
-function payouts(bytes32 loanId, uint256 usdcAmount) external {
-    Loan storage loan = loans[loanId];
-    require(loan.isActive, "Loan is not active");
-    require(msg.sender == loan.borrower, "Only borrower can repay");
+        // Update remaining principal on the loan
+        loan.remainingPrincipal -= totalPrincipalRepaid;
 
-    // Transfer USDC from borrower to this contract
-    IERC20(usdcToken).transferFrom(msg.sender, address(this), usdcAmount);
-
-    // Get current BTC price in USDC (e.g., 1 BTC = 50,000 * 1e6 USDC if USDC has 6 decimals)
-    int256 btcPrice = getPrice(); // USDC per 1 BTC, should be 18 decimals
-    require(btcPrice > 0, "Invalid BTC price");
-
-    // Convert USDC to BTC (ensure same decimal scaling)
-    uint256 btcEquivalent = (usdcAmount * 1e18) / uint256(btcPrice); // Now we can use btcEquivalent to repay installments
-
-    uint256 remainingBtcPayment = btcEquivalent;
-    uint256 totalPrincipalRepaid = 0;
-
-    // Apply payment to amortization schedule
-    for (uint256 i = 0; i < loan.amortizationSchedule.length && remainingBtcPayment > 0; i++) {
-        Installment storage installment = loan.amortizationSchedule[i];
-        if (installment.paid) continue;
-
-        uint256 installmentTotal = installment.duePrincipal + installment.dueInterest;
-
-        if (remainingBtcPayment >= installmentTotal) {
-            // Full installment payment
-            installment.paid = true;
-            remainingBtcPayment -= installmentTotal;
-            totalPrincipalRepaid += installment.duePrincipal;
-
-            // Distribute principal + interest to lenders
-            distributePaymentToLenders(loan, installment.duePrincipal, installment.dueInterest);
-
-            emit InstallmentPaid(loanId, i);
-        } else {
-            // Partial payment not yet supported
-            break;
+        // Unstake from AAVE based on principal repaid
+        if (totalPrincipalRepaid > 0) {
+            _unstakeProportionalAmount(loanId, totalPrincipalRepaid);
+            _updateLiquidationThreshold(loanId);
         }
-    }
 
-    // Update remaining principal on the loan
-    loan.remainingPrincipal -= totalPrincipalRepaid;
-
-    // Unstake from AAVE based on principal repaid
-    if (totalPrincipalRepaid > 0) {
-        _unstakeProportionalAmount(loanId, totalPrincipalRepaid);
-        _updateLiquidationThreshold(loanId);
-    }
-
-    // Check if loan is now fully repaid
-    bool fullyRepaid = true;
-    for (uint256 i = 0; i < loan.amortizationSchedule.length; i++) {
-        if (!loan.amortizationSchedule[i].paid) {
-            fullyRepaid = false;
-            break;
+        // Check if loan is now fully repaid
+        bool fullyRepaid = true;
+        for (uint256 i = 0; i < loan.amortizationSchedule.length; i++) {
+            if (!loan.amortizationSchedule[i].paid) {
+                fullyRepaid = false;
+                break;
+            }
         }
-    }
 
-    if (fullyRepaid) {
-        loan.isActive = false;
-        hasActiveLoan[loan.borrower] = false;
+        if (fullyRepaid) {
+            loan.isActive = false;
+            hasActiveLoan[loan.borrower] = false;
 
-        // Unstake any remaining amount from AAVE
-        if (loan.stakedAmount > 0) {
-            _unstakeFromAave(loanId, loan.stakedAmount, false);
+            // Unstake any remaining amount from AAVE
+            if (loan.stakedAmount > 0) {
+                _unstakeFromAave(loanId, loan.stakedAmount, false);
+            }
         }
-    }
 
-    emit Payout(loanId, msg.sender, usdcAmount, fullyRepaid);
-}
+        emit Payout(loanId, msg.sender, usdcAmount, fullyRepaid);
+    }
 
     function _unstakeProportionalAmount(bytes32 loanId, uint256 principalRepaid) internal {
         Loan storage loan = loans[loanId];
@@ -543,6 +507,54 @@ function payouts(bytes32 loanId, uint256 usdcAmount) external {
             revert("BTC value has not dropped below liquidation threshold");
         }
     }
+
+    function liquidateIfOverdue(bytes32 loanId) external onlyOwner {
+    Loan storage loan = loans[loanId];
+    require(loan.isActive, "Loan is not active");
+
+    uint256 totalOverdueTime = 0;
+    uint256 nowTimestamp = block.timestamp;
+
+    for (uint256 i = 0; i < loan.amortizationSchedule.length; i++) {
+        Installment storage installment = loan.amortizationSchedule[i];
+        if (installment.paid) continue;
+
+        if (nowTimestamp > installment.dueTimestamp) {
+            totalOverdueTime += nowTimestamp - installment.dueTimestamp;
+        }
+    }
+
+    require(totalOverdueTime > 90 days, "Loan is not overdue beyond 3 months in total");
+
+    // Mark inactive
+    loan.isActive = false;
+    hasActiveLoan[loan.borrower] = false;
+
+    // Unstake everything
+    if (loan.stakedAmount > 0) {
+        _unstakeFromAave(loanId, loan.stakedAmount, false);
+    }
+
+    // Distribute borrower's deposit
+    uint256 totalDeposit = loan.borrowerDeposit;
+    uint256 totalOutstandingPrincipal = loan.remainingPrincipal;
+
+    if (totalOutstandingPrincipal > 0) {
+        for (uint256 i = 0; i < loan.contributions.length; i++) {
+            LenderContribution storage lc = loan.contributions[i];
+            uint256 remainingPrincipal = lc.amount - lc.repaidPrincipal;
+            if (remainingPrincipal == 0) continue;
+
+            uint256 lenderShare = (remainingPrincipal * 1e18) / totalOutstandingPrincipal;
+            uint256 depositShare = (totalDeposit * lenderShare) / 1e18;
+
+            IERC20(usdcToken).transfer(lc.lender, depositShare);
+        }
+    }
+
+    emit LoanLiquidated(loanId, loan.borrower, uint256(getPrice()));
+}
+
 
     // Function to update the Chainlink oracle address
     function setChainlinkOracle(address oracleAddress) external onlyOwner {
