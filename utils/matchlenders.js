@@ -1,4 +1,5 @@
 import { toBigInt } from 'ethers';
+import  BigNumber  from 'bignumber.js';
 
 const toBN = (value) => toBigInt(value);
 

@@ -119,16 +119,18 @@ exports.LoanAvailability = async(req,res) => {
     try{
         const allowances = await Lend.find();
 
+        console.log("Allowances:", allowances);
+
         const contractBalance = allowances.reduce((acc, allowance) => {
             return acc + parseFloat(allowance.available_amount);
         }
         , 0);
         console.log("Contract Balance:", contractBalance);
-        const parsedContractBalance = parseFloat(ethers.formatUnits(contractBalance, 6));
-        const btcAmount = await getUSDRate(parsedContractBalance);
+        // const parsedContractBalance = parseFloat(ethers.formatUnits(contractBalance, 6));
+        const btcAmount = await getUSDRate(contractBalance);
     
         const availableLoanAmount = parseFloat(btcAmount);
-        availableLoanAmountInBTC = availableLoanAmount.toFixed(2);
+        availableLoanAmountInBTC = availableLoanAmount;
     } catch (error) {
         console.log("Error fetching contract balance:", error);
         availableLoanAmountInBTC = 1;

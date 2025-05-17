@@ -11,6 +11,6 @@ const router = require("express").Router();
 router.get("/", isLoggedIn, getLoans);
 router.get("/:id", getLoanById);
 router.get("/check/liquidity", isLoggedIn, initialDetails);
-router.post("/match", isLoggedIn, matchLenders);
+router.post("/match", matchLenders);
 
 module.exports = router;

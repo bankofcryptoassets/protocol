@@ -6,8 +6,8 @@ const LendingSchema = new mongoose.Schema({
   user_address: { type: String, required: true },
   
   // Lending details from deposit event
-  lending_amount_approved: { type: String, required: true },
-  available_amount: { type: String, required: true },
+  lending_amount_approved: { type: Number, required: true },
+  available_amount: { type: Number, required: true },
     
   // Timestamps
   openedOn: { type: Date, required: true },

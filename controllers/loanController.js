@@ -132,13 +132,17 @@ const matchLenders = async(req,res) => {
       borrower_address,
       interest_rate,
       duration_months,
-    } = req.body;
+    } = req.body; 
 
-    const loanAmountBN = toBigInt(loan_amount);
+    console.log("Matching lenders for loan amount:", loan_amount);
+
+    const loanAmountBN = loan_amount;
     const availableAllowances = await Lend.find({
       user_address: { $ne: borrower_address.toLowerCase() }, // Exclude borrower
       lending_amount_approved: { $gt: "0" }
     }).sort({ lending_amount_approved: -1 }); 
+
+    console.log("Available Allowances:", availableAllowances);
 
     if (availableAllowances.length === 0) {
       return res.status(404).json({

@@ -78,8 +78,8 @@ const createAllowance = async(req,res) => {
     const existingLending = await Lend.findOne({ user_address });
     if(existingLending){
         // Update existing allowance
-        existingLending.lending_amount_approved += allowance_amount;
-        existingLending.available_amount += allowance_amount;
+        existingLending.lending_amount_approved += Number(allowance_amount);
+        existingLending.available_amount += Number(allowance_amount);
         existingLending.updated_at = Date.now();
         
        existingLending.duration_preference = duration_preference;
@@ -93,7 +93,8 @@ const createAllowance = async(req,res) => {
           user_address,
           lending_amount_approved: allowance_amount,
           available_amount: allowance_amount,
-          duration_preference
+          duration_preference,
+          openedOn: new Date()  
         });
     
         await newLending.save();
