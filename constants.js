@@ -3,9 +3,9 @@ const { abi } =  require("./artifacts/Contracts/Lending.sol/LendingPool.json");
 require("dotenv").config();
 
 const provider = new ethers.JsonRpcProvider(
-  "https://rpc.testnet.citrea.xyz" // change RPC URL
+  'https://sepolia.base.org' // change RPC URL
 );
-const contractAddress = "0x96BD2F1AffB134c0d67CfF763Ec33f073cc7F618"; // change 
+const contractAddress = "0xd8c555F728aCD2441a60e0da3f2591464f364C9c"; // change 
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
 const contract = new ethers.Contract(contractAddress, abi, wallet);

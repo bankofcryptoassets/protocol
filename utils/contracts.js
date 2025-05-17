@@ -4,10 +4,10 @@ const erc20Abi = require("../public/ERC20Abi.json");
 const routerAbi = require("../public/RouterAbi.json");
 const zeistalAbi = require("../public/ZeistalAbi.json");
 
-const rpc = new ethers.JsonRpcProvider("https://rpc.testnet.citrea.xyz"); // Replace with actual RPC URL
-const routerContractAddress = "0xb45670f668EE53E62b5F170B5B1d3C6701C8d03A";
-const usdcContractAddress = "0xb669dC8cC6D044307Ba45366C0c836eC3c7e31AA";
-const zeistalContractAddress = "0x47BfDA04dEA5FDe151541feB33C2cd24A9c0b4f7";
+const rpc = new ethers.JsonRpcProvider("https://sepolia.base.org"); // Replace with actual RPC URL
+const routerContractAddress = "0xb1c026CFce4478DaF34FD72cB8ac959e35823F21";
+const usdcContractAddress = "0x377faBD7d29562c059Dd2D3A9C41eF6974d26B21";
+const zeistalContractAddress = "0xd8c555F728aCD2441a60e0da3f2591464f364C9c";
 
 const routerContract = new ethers.Contract(
   routerContractAddress,

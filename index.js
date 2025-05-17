@@ -1,6 +1,7 @@
 // interest rate is 5%
 const express = require("express");
 const cron = require("node-cron");
+const cors = require("cors");
 
 const { connectDB } = require("./utils/db");
 const userRouter = require("./routes/userRouter");
@@ -19,17 +20,39 @@ const { runAutoPayout } = require("./engine/autoPayCron");
 const app = express();
 connectDB();
 
+// Configure CORS with proper preflight support
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Accept",
+    ],
+    credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  })
+)
+
+// Add a specific handler for OPTIONS requests
+app.options("*", cors())
+
 // schedule cron for every 5 seconds
-// cron.schedule("*/5 * * * * *", async () => {
-//   await recordDeposit();
-//   await recordLoanEvents();
-//   await recordPayoutEvents();
-//   await runAutoPayout();
-// });
+cron.schedule("*/5 * * * * *", async () => {
+  // await recordDeposit();
+  await recordLoanEvents();
+  await recordPayoutEvents();
+  await runAutoPayout();
+});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(seralizeUser);
+
+
 
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter);
