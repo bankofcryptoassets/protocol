@@ -15,7 +15,7 @@ const recordLoanEvents = async () => {
     // Fetch loan creation events from the last 100 blocks
     const loanCreatedEvents = await contract.queryFilter(
       contract.filters.LoanCreated(),
-      blockNumber - 100
+      blockNumber - 1000
     );
     
     console.log(`Found ${loanCreatedEvents.length} LoanCreated events`);
@@ -37,80 +37,114 @@ const processLoanCreatedEvent = async (event) => {
   try {
     const { id, amount, collateral, borrower } = event.args;
     console.log(`Processing loan created: ${id}`);
-    
-    // Get the loan details from the contract
+
+    // 1. Fetch from contract
     const loanDetails = await contract.loans(id);
-    
-    // Get the amortization schedule from the contract
     const installments = await contract.getInstallmentSchedule(id);
-    
-    // Calculate important values for the loan based on contract data
-    const totalPrincipal = loanDetails.principal;
-    const interestRate = loanDetails.interestRate.toNumber();
-    const loanDuration = loanDetails.duration.toNumber();
-    const borrowerDeposit = loanDetails.borrowerDeposit.toNumber();
-    const monthlyPayment = loanDetails.monthlyPayment.toNumber();
-    const startTime = new Date(loanDetails.startTime.toNumber() * 1000);
-    const btcPriceAtCreation = loanDetails.btcPriceAtCreation.toNumber();
-    
-    // Extract lender contributions
-    const contributions = [];
-    for (let i = 0; i < loanDetails.contributions.length; i++) {
-      const contribution = await contract.loans(id).contributions(i);
-      contributions.push({
-        lender: contribution.lender,
-        amount: contribution.amount.toNumber(),
-        receivableInterest: contribution.receivableInterest.toNumber(),
-        repaidPrincipal: contribution.repaidPrincipal.toNumber(),
-        repaidInterest: contribution.repaidInterest.toNumber()
-      });
-    }
-    
-    // Check if we already have this loan in our database
-    const existingLoan = await Loan.findOne({ loan_id: id });
-    
-    if (existingLoan) {
-      console.log(`Loan ${id} already exists in database, updating`);
-      // Update existing loan
-      // existingLoan.asset_price = btcPriceAtCreation;
-      // existingLoan.openedOn = startTime;
-      await existingLoan.save();
-      return;
-    }
-    
-    // Calculate additional required fields based on contract data
+    const chainId = Number((await provider.getNetwork()).chainId);
+
+    console.log(loanDetails)
+
+    // 2. Convert BigNumber to JS numbers
+    const totalPrincipal = Number(loanDetails.principal) / 1e6;
+    const interestRate = Number(loanDetails.interestRate);
+    const loanDuration = Number(loanDetails.duration);
+    const borrowerDeposit = Number(loanDetails.borrowerDeposit) / 1e6;
+    const monthlyPayment = Number(loanDetails.monthlyPayment) / 1e6;
+    const startTime = new Date(Number(loanDetails.startTime) * 1000);
+    const btcPriceAtCreation = Number(loanDetails.btcPriceAtCreation) / 1e8;
+
+    // 3. Calculate additional values
     const interest = (interestRate / 100) * totalPrincipal;
     const totalAmountPayable = totalPrincipal + interest;
-    const numberOfMonthlyInstallments = loanDuration;
-    const interestPayableMonth = interest / numberOfMonthlyInstallments;
-    const principalPayableMonth = totalPrincipal / numberOfMonthlyInstallments;
-    
-    // Find user by blockchain address
-    const user = await User.findOne({ user_address: borrower });
-    
+    const interestPayableMonth = interest / loanDuration;
+    const principalPayableMonth = totalPrincipal / loanDuration;
+    const assetBorrowed = Number(loanDetails.stakedAmount) / 1e8;
+    const assetRemaining = assetBorrowed;
+    const assetReleasedPerMonth = assetBorrowed / loanDuration;
+    const loanEndDate = new Date(startTime.getTime() + loanDuration * 30 * 24 * 60 * 60 * 1000);
+
+    // 4. Fetch User
+    const user = await User.findOne({ user_address: borrower.toLowerCase() });
     if (!user) {
       console.error(`User with wallet address ${borrower} not found`);
       return;
     }
+
+    const [
+      lenders,
+      amounts,
+      receivableInterests,
+      repaidPrincipals,
+      repaidInterests,
+    ] = await contract.getContributions(id);
+    // 6. Fetch contributions
+    const contributions = lenders.map((lender, i) => ({
+      lender,
+      amount: Number(amounts[i]) / 1e6,
+      receivableInterest: Number(receivableInterests[i]) / 1e6,
+      repaidPrincipal: Number(repaidPrincipals[i]) / 1e6,
+      repaidInterest: Number(repaidInterests[i]) / 1e6,
+    }));
+
+    console.log(`Contributions: ${JSON.stringify(contributions)}`);
+
+    await updateAllowancesAfterLoan(id, contributions);
+
+
+    // 5. Check if loan already exists
+    const existingLoan = await Loan.findOne({ loan_id: id });
+    if (existingLoan) {
+      console.log(`Loan ${id} already exists. Skipping creation.`);
+      return;
+    }
+
     
-    // Create a new loan in the database
+
+    // 7. Build lender-related arrays
+    const lendersCapitalInvested = contributions.map((c) => ({
+      user_address: c.lender,
+      amount: c.amount,
+      amount_received: 0,
+      received_interest: 0,
+      total_received: 0,
+      remaining_amount: c.amount,
+    }));
+
+    const receivableAmountMonthlyByLenders = contributions.map((c) => ({
+      user_address: c.lender,
+      amount: c.amount / loanDuration,
+      interest: c.receivableInterest / loanDuration,
+      total_amount: (c.amount + c.receivableInterest) / loanDuration,
+      remaining_amount: c.amount + c.receivableInterest,
+    }));
+
+    // 8. Build amortization schedule
+    const amortization_schedule = installments.map((inst) => ({
+      duePrincipal: Number(inst.duePrincipal) / 1e6,
+      dueInterest: Number(inst.dueInterest) / 1e6,
+      paid: inst.paid,
+    }));
+
+    // 9. Create new loan entry
     const loan = await Loan.create({
+      loan_id: id,
       user_id: user._id,
       user_address: borrower,
       loan_amount: totalPrincipal,
       up_front_payment: borrowerDeposit,
       total_amount_payable: totalAmountPayable,
-      remaining_amount: totalPrincipal,
+      remaining_amount: totalAmountPayable,
       collateral: borrowerDeposit,
-      asset: "BTC", // From contract this appears to be cbBTC
-      asset_borrowed: totalPrincipal / btcPriceAtCreation, // Convert USDC to BTC amount
-      asset_remaining: totalPrincipal / btcPriceAtCreation,
+      asset: "BTC",
+      asset_borrowed: assetBorrowed,
+      asset_remaining: assetRemaining,
       asset_price: btcPriceAtCreation,
-      asset_released_per_month: (totalPrincipal / btcPriceAtCreation) / numberOfMonthlyInstallments,
-      chain_id: await provider.getNetwork().then(net => net.chainId),
+      asset_released_per_month: assetReleasedPerMonth,
+      chain_id: chainId,
       interest_rate: interestRate,
       loan_duration: loanDuration,
-      number_of_monthly_installments: numberOfMonthlyInstallments,
+      number_of_monthly_installments: loanDuration,
       interest: interest,
       monthly_payable_amount: monthlyPayment,
       interest_payable_month: interestPayableMonth,
@@ -118,64 +152,39 @@ const processLoanCreatedEvent = async (event) => {
       liquidation_factor: totalPrincipal - borrowerDeposit,
       openedOn: startTime,
       last_payment_date: startTime,
-      next_payment_date: new Date(startTime.getTime() + (30 * 24 * 60 * 60 * 1000)), // 30 days later
+      next_payment_date: new Date(startTime.getTime() + 30 * 24 * 60 * 60 * 1000),
       months_not_paid: 0,
-      loan_end: new Date(startTime.getTime() + (loanDuration * 30 * 24 * 60 * 60 * 1000)),
-      loan_id: id, // Store the contract loan ID
-      is_active: true
+      loan_end: loanEndDate,
+      is_active: true,
+      is_liquidated: false,
+      is_repaid: false,
+      is_defaulted: false,
+      lenders_capital_invested: lendersCapitalInvested,
+      receivable_amount_monthly_by_lenders: receivableAmountMonthlyByLenders,
+      amortization_schedule,
+      lends: [],
+      receivable_amount_By_lenders: [],
+      receivable_interest_by_lenders: 0,
+      payments: [],
+      withdrawable_by_user: [],
+      bounce: false,
     });
-    
-    // Add lender contributions
-    const lendersCapitalInvested = [];
-    const receivableAmountMonthlyByLenders = [];
-    
-    for (const contribution of contributions) {
-      lendersCapitalInvested.push({
-        user_address: contribution.lender,
-        amount: contribution.amount,
-        amount_received: 0,
-        received_interest: 0,
-        total_received: 0,
-        remaining_amount: contribution.amount
-      });
-      
-      receivableAmountMonthlyByLenders.push({
-        user_address: contribution.lender,
-        amount: contribution.amount / numberOfMonthlyInstallments,
-        interest: contribution.receivableInterest / numberOfMonthlyInstallments,
-        total_amount: (contribution.amount + contribution.receivableInterest) / numberOfMonthlyInstallments,
-        remaining_amount: contribution.amount
-      });
-    }
-    
-    loan.lenders_capital_invested = lendersCapitalInvested;
-    loan.receivable_amount_monthly_by_lenders = receivableAmountMonthlyByLenders;
 
-    loan.amortization_schedule = installments.map(inst => ({
-      duePrincipal: inst.duePrincipal.toNumber(),
-      dueInterest: inst.dueInterest.toNumber(),
-      paid: inst.paid
-    }));
-    
-    await loan.save();
-    
-    // Update user
+    // 10. Update user
     user.loans.push(loan._id);
     user.totalCapitalBorrowed = {
-      chain_id: await provider.getNetwork().then(net => net.chainId),
+      chain_id: chainId,
       amount: totalPrincipal,
-      asset: "BTC"
+      asset: "BTC",
     };
     await user.save();
 
-    await updateAllowancesAfterLoan(id, contributions);
-    
     console.log(`Loan ${id} saved to database`);
+
   } catch (error) {
     console.error(`Error processing loan created event:`, error);
   }
 };
-
 /**
  * Process an InstallmentPaid event
  */
@@ -221,7 +230,7 @@ const processInstallmentPaidEvent = async (event) => {
 
 const updateAllowancesAfterLoan = async (loanId, contributions) => {
   try {
-    
+    const loan = await Loan.findOne({ loan_id: loanId });
     console.log(`Updating allowances for loan ${loanId} with ${contributions.length} lenders`);
     
     // Update each lender's available allowance
@@ -231,14 +240,16 @@ const updateAllowancesAfterLoan = async (loanId, contributions) => {
       
       // Find the lender's allowance
       const allowance = await Lend.findOne({
-        user_address: lenderAddress.toLowerCase(),
+        user_address: lenderAddress,
       });
+
+      console.log(`Allowance for lender ${lenderAddress}: ${JSON.stringify(allowance)}`);
       
       console.log(`Updating allowance for lender ${lenderAddress}, contribution: ${contributionAmount}`);
       
       // Calculate new available amount
-      const currentAvailable = BigInt(allowance.available_amount);
-      const contributionAmountBigInt = BigInt(contributionAmount);
+      const currentAvailable = Number(allowance.available_amount);
+      const contributionAmountBigInt = Number(contributionAmount);
       
       if (currentAvailable < contributionAmountBigInt) {
         console.error(`Lender ${lenderAddress} has insufficient allowance: available=${currentAvailable}, required=${contributionAmountBigInt}`);
@@ -249,7 +260,7 @@ const updateAllowancesAfterLoan = async (loanId, contributions) => {
       
       // Update allowance
       allowance.available_amount = Number(newAvailable);
-      allowance.loans.push(loanId);
+      allowance.loans.push(loan._id);
       allowance.updated_at = new Date();
       
       await allowance.save();

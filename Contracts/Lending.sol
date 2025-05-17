@@ -626,6 +626,33 @@ function _pow(uint256 base, uint256 exp) internal pure returns (uint256 result) 
     }
 }
 
+function getContributions(bytes32 loanId) external view returns (
+    address[] memory lenders,
+    uint256[] memory amounts,
+    uint256[] memory receivableInterests,
+    uint256[] memory repaidPrincipals,
+    uint256[] memory repaidInterests
+) {
+    Loan storage loan = loans[loanId];
+    uint256 len = loan.contributions.length;
+
+    lenders = new address[](len);
+    amounts = new uint256[](len);
+    receivableInterests = new uint256[](len);
+    repaidPrincipals = new uint256[](len);
+    repaidInterests = new uint256[](len);
+
+    for (uint256 i = 0; i < len; i++) {
+        LenderContribution storage c = loan.contributions[i];
+        lenders[i] = c.lender;
+        amounts[i] = c.amount;
+        receivableInterests[i] = c.receivableInterest;
+        repaidPrincipals[i] = c.repaidPrincipal;
+        repaidInterests[i] = c.repaidInterest;
+    }
+}
+
+
 
 
 }
