@@ -66,9 +66,13 @@ contract MockAavePool {
      * @param to The address that will receive the underlying asset
      * @return The actual amount withdrawn
      */
-        function withdraw(address asset, uint256 amount, address to) external returns (uint256) {        
+    function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
+        // Check if user has enough balance
+        uint256 currentBalance = userSupplies[msg.sender][asset];
+        require(currentBalance >= amount, "Insufficient balance for withdrawal");
+        
         // Update storage first to prevent reentrancy
-        userSupplies[msg.sender][asset] -= amount;
+        userSupplies[msg.sender][asset] = currentBalance - amount;
         
         // Transfer the asset to the specified address
         bool success = IERC20(asset).transfer(to, amount);
@@ -78,7 +82,6 @@ contract MockAavePool {
         
         return amount;  // Return actual amount withdrawn
     }
-
     /**
      * @dev Returns the total supplied amount of an asset by a user
      * @param asset The asset address

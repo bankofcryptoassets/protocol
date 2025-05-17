@@ -346,8 +346,7 @@ function payouts(bytes32 loanId, uint256 usdcAmount) external {
 }
 
 
-    function _unstakeFromAave(bytes32 loanId, uint256 cbBtcAmount, bool returnToBorrower) internal {
-
+function _unstakeFromAave(bytes32 loanId, uint256 cbBtcAmount, bool returnToBorrower) internal {
     Loan storage loan = loans[loanId];
     require(cbBtcAmount <= loan.stakedAmount, "Cannot unstake more than staked amount");
     require(cbBtcAmount > 0, "Cannot unstake zero amount");
@@ -355,8 +354,8 @@ function payouts(bytes32 loanId, uint256 usdcAmount) external {
     // Debug balance check before withdrawal
     uint256 preBalance = IERC20(cbBtcToken).balanceOf(address(this));
     
-    // Withdraw from Aave pool to LendingPool
-    uint256 actualWithdrawn = aavePool.withdraw(cbBtcToken, cbBtcAmount, loan.borrower);
+    // Withdraw from Aave pool
+    uint256 actualWithdrawn = aavePool.withdraw(cbBtcToken, cbBtcAmount, address(this));
     
     // Debug balance check after withdrawal
     uint256 postBalance = IERC20(cbBtcToken).balanceOf(address(this));
@@ -365,7 +364,7 @@ function payouts(bytes32 loanId, uint256 usdcAmount) external {
     require(postBalance > preBalance, "Withdrawal didn't increase balance");
     require(actualWithdrawn > 0, "Unstake returned zero tokens");
 
-    // Update internal state
+    // Update internal state - use actualWithdrawn instead of cbBtcAmount
     loan.stakedAmount -= actualWithdrawn;
 
     // If borrower is to receive the tokens back
@@ -379,8 +378,10 @@ function payouts(bytes32 loanId, uint256 usdcAmount) external {
         uint256 usdcReceived = _swapCbBtcToUsdc(actualWithdrawn);
         emit TokensUnstaked(loanId, cbBtcAmount, usdcReceived, 0);
     }
+    
+    // Emit debug event
+    emit DebugUnstake(loanId, cbBtcAmount, actualWithdrawn, preBalance, postBalance);
 }
-
 // 2. Add a debug event to track withdrawal success
 event DebugUnstake(bytes32 loanId, uint256 requested, uint256 actualWithdrawn, uint256 preBalance, uint256 postBalance);
 

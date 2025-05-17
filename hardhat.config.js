@@ -1,5 +1,7 @@
 /** @type import('hardhat/config').HardhatUserConfig */
 require("@nomicfoundation/hardhat-toolbox");
+require("dotenv").config();
+
 
 
 module.exports = {
@@ -16,6 +18,12 @@ module.exports = {
   networks: {
     hardhat: {
       chainId: 1337,
+    },
+    base_sepolia: {
+      url: 'https://sepolia.base.org',
+      accounts: {
+        mnemonic: process.env.MNEMONIC ?? '',
+      },
     },
   },
 };

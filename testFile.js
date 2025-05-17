@@ -222,7 +222,7 @@ async function main() {
 
 
 // Approve repayment
-const repaymentAmount = parseUnits("10000", 6); // First repayment
+const repaymentAmount = parseUnits("3517", 6); // First repayment
 await usdc.connect(borrower).approve(lendingPoolAddress, repaymentAmount);
 console.log(`Borrower approved ${formatUnits(repaymentAmount, 6)} USDC for repayment`);
 
@@ -232,7 +232,7 @@ console.log(`Borrower allowance: ${formatUnits(allowance, 6)} USDC`);
 const borrowerBalance = await usdc.balanceOf(borrower.address);
 console.log(`Borrower balance: ${formatUnits(borrowerBalance, 6)} USDC`);
 
-const debug = await lendingPool.debugUnstakeCalc(loanId, parseUnits("8333.3333", 6)); // principal repaid in this payout
+const debug = await lendingPool.debugUnstakeCalc(loanId, parseUnits("3183.3", 6)); // principal repaid in this payout
 console.log(`Proportion repaid: ${ethers.formatUnits(debug[0], 18)} (1.0 = fully repaid)`);
 console.log(`cbBTC to unstake: ${ethers.formatUnits(debug[1], 8)} cbBTC`);
 
