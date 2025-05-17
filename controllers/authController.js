@@ -1,6 +1,5 @@
 const jwt = require("jsonwebtoken")
 const dotenv = require("dotenv")
-const ethers = require("ethers")
 const AppError = require("../utils/appError")
 const { createPublicClient, http } = require("viem")
 const { parseSiweMessage } = require("viem/siwe")
@@ -39,8 +38,6 @@ exports.verifyUser = async (req, res, next) => {
   try {
     let decoded = jwt.verify(token, process.env.JWTSECRET)
 
-    let nonce = decoded.nonce
-    let address = decoded.address
     console.log("decoded: ", decoded)
     let signature = req.body.signature
 
@@ -48,26 +45,9 @@ exports.verifyUser = async (req, res, next) => {
     let message = req.body.message
 
     // If no message is provided or it's not in SIWE format, create one
-    if (
-      !message ||
-      typeof message !== "string" ||
-      !message.includes("wants you to sign in with your Ethereum account")
-    ) {
-      // Create a proper SIWE message
-      const { createSiweMessage } = require("viem/siwe")
-
-      message = createSiweMessage({
-        domain: req.get("host") || "bitmore.protocol",
-        address: address,
-        statement: "Sign in with Ethereum to the Bitmore Protocol",
-        uri: req.protocol + "://" + req.get("host"),
-        version: "1",
-        chainId: baseSepolia.id,
-        nonce: nonce.toString(),
-      })
+    if (!message) {
+      return next(new AppError("Invalid message", 403))
     }
-
-    console.log("SIWE message: ", message)
 
     const publicClient = createPublicClient({
       chain: baseSepolia,
@@ -79,8 +59,6 @@ exports.verifyUser = async (req, res, next) => {
       message: message,
       signature: signature,
     })
-
-    console.log("Verification result: ", valid)
 
     if (!valid) {
       return next(new AppError("Invalid Signature", 403))
@@ -100,9 +78,17 @@ exports.verifyUser = async (req, res, next) => {
       })
     }
 
-    let JwtToken = jwt.sign({ id: user._id }, process.env.JWTSECRET, {
-      expiresIn: "1d",
-    })
+    let JwtToken = jwt.sign(
+      {
+        id: user._id,
+        address: siweMessage.address,
+        chainId: siweMessage.chainId,
+        domain: siweMessage.domain,
+        nonce: siweMessage.nonce,
+      },
+      process.env.JWTSECRET,
+      { expiresIn: "1d" }
+    )
 
     res.status(200).json({
       status: "success",
