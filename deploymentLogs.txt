@@ -1,0 +1,33 @@
+Starting deployment script for Base network...
+Deploying with account: 0x788Bbf4fC1aCd8878486429de7B204fFaA949090
+Deploying MockDeployer...
+MockDeployer deployed to: 0x45dF8BF8Ed77Fe7c7549f85edc6ca085beF82D51
+Deploying mock contracts...
+All mock contracts deployed!
+Initializing mock contracts...
+Mock contracts initialized with liquidity and settings!
+Deployed Contract Addresses:
+----------------------------
+USDC:          0x377faBD7d29562c059Dd2D3A9C41eF6974d26B21
+cbBTC:         0x905DFbD63Eb404E9A6A03B447c037EC7260478cF
+AavePool:      0x044a1Caf72d89f67a4801bB77F858C9A2795b57A
+SwapRouter:    0xb1c026CFce4478DaF34FD72cB8ac959e35823F21
+Price Oracle:  0x82B69b98f03158f823aF558310a32b0A8fAb2C5B
+Minting test tokens for deployer...
+Minted 1,000,000 USDC and 100 cbBTC for 0x788Bbf4fC1aCd8878486429de7B204fFaA949090
+Deployer USDC balance: 1000000.0 USDC
+Deployer cbBTC balance: 100.0 cbBTC
+Adding liquidity to swap router...
+Added 500000.0 USDC and 50.0 cbBTC to the swap router
+Deploying LendingPool contract...
+LendingPool deployed to: 0xd8c555F728aCD2441a60e0da3f2591464f364C9c
+
+Summary - All Deployed Contract Addresses:
+----------------------------------------
+MockDeployer:  0x45dF8BF8Ed77Fe7c7549f85edc6ca085beF82D51
+USDC:          0x377faBD7d29562c059Dd2D3A9C41eF6974d26B21
+cbBTC:         0x905DFbD63Eb404E9A6A03B447c037EC7260478cF
+AavePool:      0x044a1Caf72d89f67a4801bB77F858C9A2795b57A
+SwapRouter:    0xb1c026CFce4478DaF34FD72cB8ac959e35823F21
+Price Oracle:  0x82B69b98f03158f823aF558310a32b0A8fAb2C5B
+LendingPool:   0xd8c555F728aCD2441a60e0da3f2591464f364C9c
