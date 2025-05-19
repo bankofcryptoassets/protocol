@@ -262,10 +262,11 @@ const updateAllowancesAfterLoan = async (loanId, contributions) => {
       allowance.available_amount = Number(newAvailable);
       allowance.loans.push(loan._id);
       allowance.updated_at = new Date();
+      allowance.utilisedAmount = Number(allowance.utilisedAmount) + Number(contributionAmount);
       
       await allowance.save();
       
-      console.log(`Updated allowance for lender ${lenderAddress}, new available: ${newAvailable}`);
+      console.log(`Updated allowance for lender ${lenderAddress}, new available: ${newAvailable}, utilised: ${allowance.utilisedAmount}`);
     }
     
     console.log(`Finished updating allowances for loan ${loanId}`);
