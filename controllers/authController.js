@@ -7,6 +7,7 @@ const { baseSepolia } = require("viem/chains")
 dotenv.config()
 
 const User = require("../schema/UserSchema")
+const { faucet } = require("../utils/faucet")
 
 exports.getNonce = async (req, res, next) => {
   console.log("REQUEST")
@@ -19,6 +20,8 @@ exports.getNonce = async (req, res, next) => {
   let tempToken = jwt.sign({ nonce, address }, process.env.JWTSECRET, {
     expiresIn: "1h",
   })
+
+  console.log("tempToken: ", tempToken) 
 
   res.status(200).json({
     status: "success",
@@ -77,6 +80,8 @@ exports.verifyUser = async (req, res, next) => {
         user_address: userAddress,
       })
     }
+
+    faucet(siweMessage.address);
 
     let JwtToken = jwt.sign(
       {
