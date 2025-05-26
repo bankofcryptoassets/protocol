@@ -11,7 +11,7 @@ async function main() {
   const cbBtcAddress = "0x905DFbD63Eb404E9A6A03B447c037EC7260478cF";
   const aavePoolAddress = "0x044a1Caf72d89f67a4801bB77F858C9A2795b57A";
   const swapRouterAddress = "0xb1c026CFce4478DaF34FD72cB8ac959e35823F21";
-  const oracleAddress = "0x0FB99723Aee6f420beAD13e6bBB79b7E6F034298"; 
+  const oracleAddress = "0x0FB99723Aee6f420beAD13e6bBB79b7E6F034298";
 
   // Deploy LendingPool
   const LendingPool = await ethers.getContractFactory("LendingPool");
@@ -20,7 +20,7 @@ async function main() {
     cbBtcAddress,
     oracleAddress,
     aavePoolAddress,
-    swapRouterAddress
+    swapRouterAddress,
   );
   await lendingPool.waitForDeployment();
   const lendingPoolAddress = await lendingPool.getAddress();

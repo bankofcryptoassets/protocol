@@ -34,11 +34,11 @@ app.use(
     credentials: true,
     preflightContinue: false,
     optionsSuccessStatus: 204,
-  })
-)
+  }),
+);
 
 // Add a specific handler for OPTIONS requests
-app.options("*", cors())
+app.options("*", cors());
 
 // schedule cron for every 5 seconds
 cron.schedule("*/5 * * * * *", async () => {
@@ -51,8 +51,6 @@ cron.schedule("*/5 * * * * *", async () => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(seralizeUser);
-
-
 
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter);

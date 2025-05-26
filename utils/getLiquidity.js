@@ -9,7 +9,7 @@ const getLiquidity = async (duration, user_id) => {
   if (duration) {
     // Fetch lendings with a specified duration filter
     lendings = await Lend.find({
-      lending_duration: { $gte: duration }
+      lending_duration: { $gte: duration },
     }).sort({
       timestamp: 1,
     });

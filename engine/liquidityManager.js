@@ -20,7 +20,7 @@ async function manageLiquidity(loanId) {
 
     // Total amount required for the loan
     let remainingLoanAmount = loan.collateral;
-    let totalInterest = loan.interest;
+    const totalInterest = loan.interest;
     const monthlyInterestRate =
       totalInterest / loan.number_of_monthly_installments; // Monthly interest rate as a percentage
 
@@ -36,11 +36,11 @@ async function manageLiquidity(loanId) {
     let totalLendContribution = 0;
 
     // Step 3: Distribute loan amount among lenders and calculate monthly receivables
-    for (let lending of lendings) {
+    for (const lending of lendings) {
       // Calculate each lender's contribution to the loan and interest
       const lendAmount = Math.min(
         lending.lending_amount_approved,
-        remainingLoanAmount
+        remainingLoanAmount,
       );
       const lenderContributionRatio = lendAmount / loan.loan_amount;
 
@@ -82,12 +82,16 @@ async function manageLiquidity(loanId) {
       });
 
       lendersList.push(lending.user_address);
-     // Convert BigInt to String to make it serializable
-     capitalList.push(ethers.parseEther(lendAmount.toString()).toString());
-     interestList.push(ethers.parseEther(monthlyInterest.toString()).toString());
-     totalPrincipalList.push(
-       ethers.parseEther((monthlyPrincipal + monthlyInterest).toString()).toString()
-     );
+      // Convert BigInt to String to make it serializable
+      capitalList.push(ethers.parseEther(lendAmount.toString()).toString());
+      interestList.push(
+        ethers.parseEther(monthlyInterest.toString()).toString(),
+      );
+      totalPrincipalList.push(
+        ethers
+          .parseEther((monthlyPrincipal + monthlyInterest).toString())
+          .toString(),
+      );
       // Reduce the remaining loan amount and track total contributions
       remainingLoanAmount -= lendAmount;
       totalLendContribution += lendAmount;

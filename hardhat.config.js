@@ -2,8 +2,6 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("dotenv").config();
 
-
-
 module.exports = {
   solidity: {
     version: "0.8.20",
@@ -20,9 +18,9 @@ module.exports = {
       chainId: 1337,
     },
     base_sepolia: {
-      url: 'https://sepolia.base.org',
+      url: "https://sepolia.base.org",
       accounts: {
-        mnemonic: process.env.MNEMONIC ?? '',
+        mnemonic: process.env.MNEMONIC ?? "",
       },
     },
   },

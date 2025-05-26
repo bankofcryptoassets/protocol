@@ -18,14 +18,25 @@ const PaymentSchema = new mongoose.Schema({
   ],
 });
 
-
-PaymentSchema.methods.calculateTotalDistribution = function() {
-  return this.distributions.reduce((total, distribution) => total + distribution.total, 0);
+PaymentSchema.methods.calculateTotalDistribution = function () {
+  return this.distributions.reduce(
+    (total, distribution) => total + distribution.total,
+    0,
+  );
 };
 
-PaymentSchema.methods.addDistribution = function(userAddress, amount, interest) {
+PaymentSchema.methods.addDistribution = function (
+  userAddress,
+  amount,
+  interest,
+) {
   const total = amount + interest;
-  this.distributions.push({ user_address: userAddress, amount, interest, total });
+  this.distributions.push({
+    user_address: userAddress,
+    amount,
+    interest,
+    total,
+  });
 };
 
 const Payment = mongoose.model("Payment", PaymentSchema);

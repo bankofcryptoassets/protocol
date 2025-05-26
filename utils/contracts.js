@@ -12,17 +12,17 @@ const zeistalContractAddress = "0xd8c555F728aCD2441a60e0da3f2591464f364C9c";
 const routerContract = new ethers.Contract(
   routerContractAddress,
   routerAbi.abi,
-  rpc
+  rpc,
 );
 const usdcContract = new ethers.Contract(
   usdcContractAddress,
   erc20Abi.abi,
-  rpc
+  rpc,
 );
 const zeistalContract = new ethers.Contract(
   zeistalContractAddress,
   zeistalAbi.abi,
-  rpc
+  rpc,
 );
 
 module.exports = { routerContract, usdcContract, zeistalContract };

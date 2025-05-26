@@ -57,4 +57,3 @@ const liquidityManagerSchema = {
   asset,
   totalAvailableLiquidity,
 };
-

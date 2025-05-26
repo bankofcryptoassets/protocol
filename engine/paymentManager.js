@@ -7,7 +7,7 @@ async function processPayment(paymentId) {
     // Retrieve the payment and loan details
     const payment = await Payment.findById(paymentId).populate("loan_id");
     const loan = await Loan.findById(payment.loan_id).populate(
-      "lenders_capital_invested.user_id"
+      "lenders_capital_invested.user_id",
     );
 
     if (!payment || !loan) {
@@ -24,7 +24,7 @@ async function processPayment(paymentId) {
     // Calculate total lenders' capital to determine each lender's share
     const totalLendersCapital = loan.lenders_capital_invested.reduce(
       (acc, lender) => acc + lender.amount,
-      0
+      0,
     );
 
     // Distribute principal and interest to lenders based on their share
@@ -55,7 +55,7 @@ async function processPayment(paymentId) {
       (lender, index) => ({
         ...lender.toObject(),
         ...lendersDistribution[index],
-      })
+      }),
     );
 
     // // Save the updated loan information
@@ -79,7 +79,7 @@ async function processPayment(paymentId) {
     await payment.save();
 
     console.log(
-      "Payment processed, with principal and interest separated successfully."
+      "Payment processed, with principal and interest separated successfully.",
     );
   } catch (error) {
     console.error("Error processing payment:", error);

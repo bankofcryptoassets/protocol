@@ -3,7 +3,7 @@ const {
   getLoans,
   getLoanById,
   initialDetails,
-  matchLenders
+  matchLenders,
 } = require("../controllers/loanController");
 
 const router = require("express").Router();

@@ -76,7 +76,7 @@ const getLoans = async (req, res) => {
   console.log(req.user);
   try {
     const loans = await Loan.find({ user_id: req.user._id }).populate(
-      "lends user_id"
+      "lends user_id",
     );
     return res.json({ loans });
   } catch (error) {
@@ -124,30 +124,25 @@ const initialDetails = async (req, res) => {
   }
 };
 
-
-const matchLenders = async(req,res) => {
-  try{
-    const {
-      loan_amount,
-      borrower_address,
-      interest_rate,
-      duration_months,
-    } = req.body; 
+const matchLenders = async (req, res) => {
+  try {
+    const { loan_amount, borrower_address, interest_rate, duration_months } =
+      req.body;
 
     console.log("Matching lenders for loan amount:", loan_amount);
 
     const loanAmountBN = loan_amount;
     const availableAllowances = await Lend.find({
       user_address: { $ne: borrower_address.toLowerCase() }, // Exclude borrower
-      lending_amount_approved: { $gt: "0" }
-    }).sort({ lending_amount_approved: -1 }); 
+      lending_amount_approved: { $gt: "0" },
+    }).sort({ lending_amount_approved: -1 });
 
     console.log("Available Allowances:", availableAllowances);
 
     if (availableAllowances.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'No available lenders found'
+        message: "No available lenders found",
       });
     }
 
@@ -155,34 +150,33 @@ const matchLenders = async(req,res) => {
       availableAllowances,
       loanAmountBN,
       interest_rate,
-      duration_months
+      duration_months,
     );
 
     if (!matchResult.success) {
       return res.status(404).json({
         success: false,
-        message: 'Not enough liquidity available to fund this loan'
+        message: "Not enough liquidity available to fund this loan",
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: 'Lenders matched successfully',
+      message: "Lenders matched successfully",
       data: {
         matched_lenders: matchResult.lenders,
-        total_amount_matched: matchResult.totalMatched
-      }
+        total_amount_matched: matchResult.totalMatched,
+      },
     });
-
   } catch (error) {
     console.log(error);
     return res.status(500).json({ error: error.message });
   }
-}
+};
 
 module.exports = {
   getLoans,
   getLoanById,
   initialDetails,
-  matchLenders
+  matchLenders,
 };

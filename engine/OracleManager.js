@@ -13,7 +13,7 @@ const fetchDetails = async (url, authKey, token) => {
   const rawJson = await response.text();
   const safeJsonText = rawJson.replace(
     /(?<!["\d])\b\d{16,}\b(?!["])/g, // Regex to find large integers not already in quotes
-    (match) => `"${match}"` // Convert large numbers to strings
+    (match) => `"${match}"`, // Convert large numbers to strings
   );
 
   const responseData = JSON.parse(safeJsonText);
@@ -77,13 +77,13 @@ async function attestData(verifyData) {
     verify.valueComputeAlgHash,
     verify.r,
     verify.s,
-    verify.v
+    verify.v,
   );
 
   console.log("Transaction Hash", tx);
 
   const price = await contract.getPrice(wbtc);
-    console.log("Price", ethers.formatUnits(price, 18));
+  console.log("Price", ethers.formatUnits(price, 18));
 }
 
 module.exports = {

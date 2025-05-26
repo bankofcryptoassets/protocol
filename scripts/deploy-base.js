@@ -3,7 +3,7 @@ const { formatUnits } = ethers;
 
 async function main() {
   console.log("Starting deployment script for Base network...");
-  
+
   // Get deployer account
   const [deployer] = await ethers.getSigners();
   console.log(`Deploying with account: ${deployer.address}`);
@@ -39,42 +39,48 @@ async function main() {
   console.log("Minting test tokens for deployer...");
   await mockDeployer.mintTestTokens(
     deployer.address,
-    ethers.parseUnits("1000000", 6),  // 1M USDC (6 decimals)
-    ethers.parseUnits("100", 8)       // 100 BTC (8 decimals)
+    ethers.parseUnits("1000000", 6), // 1M USDC (6 decimals)
+    ethers.parseUnits("100", 8), // 100 BTC (8 decimals)
   );
   console.log(`Minted 1,000,000 USDC and 100 cbBTC for ${deployer.address}`);
-  
+
   // Get instances of ERC20 tokens
   const MockUSDC = await ethers.getContractFactory("MockUSDC");
   const MockCbBTC = await ethers.getContractFactory("MockCbBTC");
   const usdc = MockUSDC.attach(addresses[0]);
   const cbBtc = MockCbBTC.attach(addresses[1]);
-  
+
   // Check deployer's balance
   const deployerUsdcBalance = await usdc.balanceOf(deployer.address);
   const deployerBtcBalance = await cbBtc.balanceOf(deployer.address);
-  console.log(`Deployer USDC balance: ${formatUnits(deployerUsdcBalance, 6)} USDC`);
-  console.log(`Deployer cbBTC balance: ${formatUnits(deployerBtcBalance, 8)} cbBTC`);
+  console.log(
+    `Deployer USDC balance: ${formatUnits(deployerUsdcBalance, 6)} USDC`,
+  );
+  console.log(
+    `Deployer cbBTC balance: ${formatUnits(deployerBtcBalance, 8)} cbBTC`,
+  );
 
   // Add liquidity to swap router
   console.log("Adding liquidity to swap router...");
   const usdcToAdd = ethers.parseUnits("500000", 6); // 500K USDC
-  const btcToAdd = ethers.parseUnits("50", 8);      // 50 BTC
-  
+  const btcToAdd = ethers.parseUnits("50", 8); // 50 BTC
+
   await usdc.connect(deployer).transfer(addresses[3], usdcToAdd);
   await cbBtc.connect(deployer).transfer(addresses[3], btcToAdd);
-  
-  console.log(`Added ${formatUnits(usdcToAdd, 6)} USDC and ${formatUnits(btcToAdd, 8)} cbBTC to the swap router`);
+
+  console.log(
+    `Added ${formatUnits(usdcToAdd, 6)} USDC and ${formatUnits(btcToAdd, 8)} cbBTC to the swap router`,
+  );
 
   // Deploy the LendingPool contract
   console.log("Deploying LendingPool contract...");
   const LendingPool = await ethers.getContractFactory("LendingPool");
   const lendingPool = await LendingPool.deploy(
-    addresses[0],  // USDC
-    addresses[1],  // cbBTC
-    addresses[4],  // Oracle
-    addresses[2],  // Aave Pool
-    addresses[3]   // Swap Router
+    addresses[0], // USDC
+    addresses[1], // cbBTC
+    addresses[4], // Oracle
+    addresses[2], // Aave Pool
+    addresses[3], // Swap Router
   );
   await lendingPool.waitForDeployment();
   const lendingPoolAddress = await lendingPool.getAddress();
@@ -90,7 +96,7 @@ async function main() {
   console.log(`SwapRouter:    ${addresses[3]}`);
   console.log(`Price Oracle:  ${addresses[4]}`);
   console.log(`LendingPool:   ${lendingPoolAddress}`);
-  
+
   console.log("\nDeployment on Base network complete! 🎉");
 }
 

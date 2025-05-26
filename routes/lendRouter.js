@@ -1,4 +1,8 @@
-const { getLendings, getLendingById, createAllowance } = require("../controllers/lendingController");
+const {
+  getLendings,
+  getLendingById,
+  createAllowance,
+} = require("../controllers/lendingController");
 
 const router = require("express").Router();
 

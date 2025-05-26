@@ -1,4 +1,3 @@
-
 const { contract, provider } = require("../constants");
 const Loan = require("../schema/LoaningSchema");
 const User = require("../schema/UserSchema");
@@ -15,20 +14,18 @@ const recordLoanEvents = async () => {
     // Fetch loan creation events from the last 100 blocks
     const loanCreatedEvents = await contract.queryFilter(
       contract.filters.LoanCreated(),
-      blockNumber - 1000
+      blockNumber - 1000,
     );
-    
+
     console.log(`Found ${loanCreatedEvents.length} LoanCreated events`);
-    
+
     for (const event of loanCreatedEvents) {
       await processLoanCreatedEvent(event);
     }
-    
   } catch (error) {
     console.error("Error recording loan events:", error);
   }
 };
-
 
 /**
  * Process a LoanCreated event and store the data in the database
@@ -43,7 +40,7 @@ const processLoanCreatedEvent = async (event) => {
     const installments = await contract.getInstallmentSchedule(id);
     const chainId = Number((await provider.getNetwork()).chainId);
 
-    console.log(loanDetails)
+    console.log(loanDetails);
 
     // 2. Convert BigNumber to JS numbers
     const totalPrincipal = Number(loanDetails.principal) / 1e6;
@@ -62,7 +59,9 @@ const processLoanCreatedEvent = async (event) => {
     const assetBorrowed = Number(loanDetails.stakedAmount) / 1e8;
     const assetRemaining = assetBorrowed;
     const assetReleasedPerMonth = assetBorrowed / loanDuration;
-    const loanEndDate = new Date(startTime.getTime() + loanDuration * 30 * 24 * 60 * 60 * 1000);
+    const loanEndDate = new Date(
+      startTime.getTime() + loanDuration * 30 * 24 * 60 * 60 * 1000,
+    );
 
     // 4. Fetch User
     const user = await User.findOne({ user_address: borrower.toLowerCase() });
@@ -91,15 +90,12 @@ const processLoanCreatedEvent = async (event) => {
 
     await updateAllowancesAfterLoan(id, contributions);
 
-
     // 5. Check if loan already exists
     const existingLoan = await Loan.findOne({ loan_id: id });
     if (existingLoan) {
       console.log(`Loan ${id} already exists. Skipping creation.`);
       return;
     }
-
-    
 
     // 7. Build lender-related arrays
     const lendersCapitalInvested = contributions.map((c) => ({
@@ -152,7 +148,9 @@ const processLoanCreatedEvent = async (event) => {
       liquidation_factor: totalPrincipal - borrowerDeposit,
       openedOn: startTime,
       last_payment_date: startTime,
-      next_payment_date: new Date(startTime.getTime() + 30 * 24 * 60 * 60 * 1000),
+      next_payment_date: new Date(
+        startTime.getTime() + 30 * 24 * 60 * 60 * 1000,
+      ),
       months_not_paid: 0,
       loan_end: loanEndDate,
       is_active: true,
@@ -180,7 +178,6 @@ const processLoanCreatedEvent = async (event) => {
     await user.save();
 
     console.log(`Loan ${id} saved to database`);
-
   } catch (error) {
     console.error(`Error processing loan created event:`, error);
   }
@@ -191,84 +188,96 @@ const processLoanCreatedEvent = async (event) => {
 const processInstallmentPaidEvent = async (event) => {
   try {
     const { loanId, index } = event.args;
-    console.log(`Processing installment paid for loan ${loanId}, index ${index}`);
-    
+    console.log(
+      `Processing installment paid for loan ${loanId}, index ${index}`,
+    );
+
     // Get the loan from database
     const loan = await Loan.findOne({ loan_contract_id: loanId });
     if (!loan) {
       console.error(`Loan with contract ID ${loanId} not found`);
       return;
     }
-    
+
     // Update loan payment info
     const now = new Date();
     loan.last_payment_date = now;
-    loan.next_payment_date = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days later
-    
+    loan.next_payment_date = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days later
+
     // Get installment details from contract
     const installmentSchedule = await contract.getInstallmentSchedule(loanId);
     const installment = installmentSchedule[index];
-    
+
     const principalPaid = installment.duePrincipal.toNumber();
     const interestPaid = installment.dueInterest.toNumber();
-    
+
     // Update remaining loan amount
     loan.remaining_amount -= principalPaid;
-    
+
     // Calculate remaining asset (BTC)
     const currentBtcPrice = await contract.getPrice();
     loan.asset_remaining = loan.remaining_amount / currentBtcPrice;
-    
+
     await loan.save();
-    
+
     console.log(`Updated loan ${loanId} payment info`);
   } catch (error) {
     console.error(`Error processing installment paid event:`, error);
   }
 };
 
-
 const updateAllowancesAfterLoan = async (loanId, contributions) => {
   try {
     const loan = await Loan.findOne({ loan_id: loanId });
-    console.log(`Updating allowances for loan ${loanId} with ${contributions.length} lenders`);
-    
+    console.log(
+      `Updating allowances for loan ${loanId} with ${contributions.length} lenders`,
+    );
+
     // Update each lender's available allowance
     for (const contribution of contributions) {
       const lenderAddress = contribution.lender;
       const contributionAmount = contribution.amount;
-      
+
       // Find the lender's allowance
       const allowance = await Lend.findOne({
         user_address: lenderAddress,
       });
 
-      console.log(`Allowance for lender ${lenderAddress}: ${JSON.stringify(allowance)}`);
-      
-      console.log(`Updating allowance for lender ${lenderAddress}, contribution: ${contributionAmount}`);
-      
+      console.log(
+        `Allowance for lender ${lenderAddress}: ${JSON.stringify(allowance)}`,
+      );
+
+      console.log(
+        `Updating allowance for lender ${lenderAddress}, contribution: ${contributionAmount}`,
+      );
+
       // Calculate new available amount
       const currentAvailable = Number(allowance.available_amount);
       const contributionAmountBigInt = Number(contributionAmount);
-      
+
       if (currentAvailable < contributionAmountBigInt) {
-        console.error(`Lender ${lenderAddress} has insufficient allowance: available=${currentAvailable}, required=${contributionAmountBigInt}`);
+        console.error(
+          `Lender ${lenderAddress} has insufficient allowance: available=${currentAvailable}, required=${contributionAmountBigInt}`,
+        );
         continue;
       }
-      
+
       const newAvailable = currentAvailable - contributionAmountBigInt;
-      
+
       // Update allowance
       allowance.available_amount = Number(newAvailable);
       allowance.loans.push(loan._id);
       allowance.updated_at = new Date();
-      allowance.utilisedAmount = Number(allowance.utilisedAmount) + Number(contributionAmount);
-      
+      allowance.utilisedAmount =
+        Number(allowance.utilisedAmount) + Number(contributionAmount);
+
       await allowance.save();
-      
-      console.log(`Updated allowance for lender ${lenderAddress}, new available: ${newAvailable}, utilised: ${allowance.utilisedAmount}`);
+
+      console.log(
+        `Updated allowance for lender ${lenderAddress}, new available: ${newAvailable}, utilised: ${allowance.utilisedAmount}`,
+      );
     }
-    
+
     console.log(`Finished updating allowances for loan ${loanId}`);
   } catch (error) {
     console.error("Error updating allowances after loan:", error);
@@ -276,5 +285,5 @@ const updateAllowancesAfterLoan = async (loanId, contributions) => {
 };
 
 module.exports = {
-  recordLoanEvents
+  recordLoanEvents,
 };

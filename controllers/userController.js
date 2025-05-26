@@ -15,12 +15,14 @@ const getAllUsers = async (req, res) => {
 const getUserById = async (req, res) => {
   try {
     let id;
-    if(req.user){
-        id = req.user._id;
-    }else{
-        id = req.params.id;
+    if (req.user) {
+      id = req.user._id;
+    } else {
+      id = req.params.id;
     }
-    const user = await User.findById(id).populate("lends loans payments withdraws");
+    const user = await User.findById(id).populate(
+      "lends loans payments withdraws",
+    );
     return res.json({ user });
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -40,7 +42,8 @@ const updateUser = async (req, res) => {
 const getUserDashboard = async (req, res) => {
   try {
     const { user_address } = req.query;
-    if (!user_address) return res.status(400).json({ error: "User address is required" });
+    if (!user_address)
+      return res.status(400).json({ error: "User address is required" });
 
     const user = await User.findOne({ user_address })
       .populate({ path: "loans", model: Loan })
@@ -74,8 +77,8 @@ const getUserDashboard = async (req, res) => {
         totalLent,
         totalInterestEarned,
         totalReturns,
-        totalBorrowed
-      }
+        totalBorrowed,
+      },
     };
 
     res.json(dashboard);
@@ -85,10 +88,9 @@ const getUserDashboard = async (req, res) => {
   }
 };
 
-
 module.exports = {
   getAllUsers,
   getUserById,
   updateUser,
-  getUserDashboard
+  getUserDashboard,
 };

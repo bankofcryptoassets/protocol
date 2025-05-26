@@ -7,7 +7,7 @@ async function checkLiquidations() {
 
   const loans = await Loan.find().populate(
     "lenders_capital_invested.user_id",
-    "user_address"
+    "user_address",
   );
 
   const threshold = price * 1.0005; // +0.05% of the price

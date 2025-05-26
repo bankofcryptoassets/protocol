@@ -1,4 +1,9 @@
-const { getAllUsers, getUserById, updateUser, getUserDashboard } = require("../controllers/userController");
+const {
+  getAllUsers,
+  getUserById,
+  updateUser,
+  getUserDashboard,
+} = require("../controllers/userController");
 const { isLoggedIn } = require("../controllers/authController");
 
 const router = require("express").Router();

@@ -3,26 +3,23 @@ const Payment = require("../schema/PaymentSchema");
 const Loan = require("../schema/LoaningSchema");
 
 const recordPayoutEvents = async () => {
-try {
-        // Process payout events
-        const blockNumber = await provider.getBlockNumber();
-        const payoutEvents = await contract.queryFilter(
-          contract.filters.Payout(),
-          blockNumber - 100
-        );
-        
-        console.log(`Found ${payoutEvents.length} Payout events`);
-        
-        for (const event of payoutEvents) {
-          await processPayoutEvent(event);
-        }
-      
-} catch (error) {
-    console.error("Error recording payout events:", error);
-  
-}
-}
+  try {
+    // Process payout events
+    const blockNumber = await provider.getBlockNumber();
+    const payoutEvents = await contract.queryFilter(
+      contract.filters.Payout(),
+      blockNumber - 100,
+    );
 
+    console.log(`Found ${payoutEvents.length} Payout events`);
+
+    for (const event of payoutEvents) {
+      await processPayoutEvent(event);
+    }
+  } catch (error) {
+    console.error("Error recording payout events:", error);
+  }
+};
 
 /**
  * Process a Payout event
@@ -30,7 +27,9 @@ try {
 const processPayoutEvent = async (event) => {
   try {
     const { loanId, borrower, amount, fullyRepaid } = event.args;
-    console.log(`Processing payout for loan ${loanId}, amount ${amount}, fully repaid: ${fullyRepaid}`);
+    console.log(
+      `Processing payout for loan ${loanId}, amount ${amount}, fully repaid: ${fullyRepaid}`,
+    );
 
     const loan = await Loan.findOne({ loan_id: loanId });
     if (!loan) {
@@ -47,12 +46,14 @@ const processPayoutEvent = async (event) => {
     const distributions = [];
     for (const c of contributions) {
       const prev = loan.lenders_capital_invested.find(
-        (l) => l.user_address.toLowerCase() === c.lender.toLowerCase()
+        (l) => l.user_address.toLowerCase() === c.lender.toLowerCase(),
       );
       if (!prev) continue;
 
-      const principalDelta = c.repaidPrincipal.toNumber() - (prev.amount_received || 0);
-      const interestDelta = c.repaidInterest.toNumber() - (prev.received_interest || 0);
+      const principalDelta =
+        c.repaidPrincipal.toNumber() - (prev.amount_received || 0);
+      const interestDelta =
+        c.repaidInterest.toNumber() - (prev.received_interest || 0);
       const totalDelta = principalDelta + interestDelta;
 
       distributions.push({
@@ -95,7 +96,9 @@ const processPayoutEvent = async (event) => {
       loan.next_payment_date = null;
       loan.is_repaid = true;
     } else {
-      loan.next_payment_date = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      loan.next_payment_date = new Date(
+        now.getTime() + 30 * 24 * 60 * 60 * 1000,
+      );
     }
 
     loan.liquidation_factor = loan.remaining_amount - amount.toNumber();
@@ -130,7 +133,9 @@ const processPayoutEvent = async (event) => {
     // await user.save();
     // console.log(`User ${borrower} updated with new total capital borrowed`);
 
-    console.log(`Payment recorded for loan ${loanId}, tx: ${event.transactionHash}`);
+    console.log(
+      `Payment recorded for loan ${loanId}, tx: ${event.transactionHash}`,
+    );
   } catch (error) {
     console.error("Error processing payout event:", error);
   }

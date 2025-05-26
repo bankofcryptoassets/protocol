@@ -20,7 +20,7 @@ const Loan = require("../schema/LoaningSchema");
 //       req.body.loan_id,
 //       req.body.payment_amount
 //     );
-     
+
 //     const loan = await Loan.findById(req.body.loan_id);
 //     loan.payments.push(payment._id);
 //     loan.last_payment_date = Date.now();

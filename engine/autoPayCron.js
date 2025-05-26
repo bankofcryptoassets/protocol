@@ -4,7 +4,6 @@ const ethers = require("ethers");
 
 async function runAutoPayout() {
   try {
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -25,13 +24,13 @@ async function runAutoPayout() {
       const loanId = ethers.keccak256(
         ethers.AbiCoder.defaultAbiCoder().encode(
           ["address", "uint256"],
-          [borrower, openedOn]
-        )
+          [borrower, openedOn],
+        ),
       );
 
       const usdcAmount = ethers.parseUnits(
         loan.monthly_payable_amount.toString(),
-        6 // USDC decimals
+        6, // USDC decimals
       );
 
       try {
@@ -42,14 +41,13 @@ async function runAutoPayout() {
         // Optional: update DB dates
         loan.last_payment_date = new Date();
         loan.next_payment_date = new Date(
-          loan.next_payment_date.getTime() + 30 * 24 * 60 * 60 * 1000
+          loan.next_payment_date.getTime() + 30 * 24 * 60 * 60 * 1000,
         );
         await loan.save();
       } catch (err) {
         console.error(`❌ Failed to payout for loan ${loanId}:`, err.message);
       }
     }
-
   } catch (err) {
     console.error("🔴 Error in cron job:", err.message);
   }

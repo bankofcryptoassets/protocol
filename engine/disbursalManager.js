@@ -34,7 +34,7 @@ async function processPayment(loanId, paymentAmount) {
     (lender) => ({
       lend_id: lender.lend_id,
       remaining_amount: lender.remaining_amount,
-    })
+    }),
   );
 
   // Step 4: Calculate loan repayment percentage
@@ -57,7 +57,7 @@ async function processPayment(loanId, paymentAmount) {
     loan.lenders_capital_invested.map(async (lender) => {
       const user = await User.findById(lender.user_id);
       const userInvestment = user.investments.find(
-        (investment) => investment.loan_id.toString() === loanId.toString()
+        (investment) => investment.loan_id.toString() === loanId.toString(),
       );
 
       if (userInvestment) {
@@ -67,7 +67,7 @@ async function processPayment(loanId, paymentAmount) {
       }
 
       await user.save();
-    })
+    }),
   );
 
   // Save the loan with the updated fields
@@ -78,12 +78,12 @@ async function processPayment(loanId, paymentAmount) {
 // 1000 payment amount
 async function processPaymentWithVariedLiquidationFactor(
   loanId,
-  paymentAmount
+  paymentAmount,
 ) {
   console.log(
     "Processing payment with varied liquidation factor",
     paymentAmount,
-    loanId
+    loanId,
   );
   const loan = await Loan.findById(loanId).populate("lends");
   if (!loan) throw new Error("Loan not found");
@@ -109,21 +109,21 @@ async function processPaymentWithVariedLiquidationFactor(
     const user = await User.findById(lender.user_id);
     lendersAddresses.push(user.user_address);
     lendersAmounts.push(
-      ethers.parseEther(principalForLender.toString()).toString()
+      ethers.parseEther(principalForLender.toString()).toString(),
     );
     lendersInterest.push(
-      ethers.parseEther(interestForLender.toString()).toString()
+      ethers.parseEther(interestForLender.toString()).toString(),
     );
     totalLendersPayable.push(
       ethers
         .parseEther((principalForLender + interestForLender).toString())
-        .toString()
+        .toString(),
     );
   });
 
   console.debug(
     "Lender receivable details,",
-    loan.receivable_amount_monthly_by_lenders
+    loan.receivable_amount_monthly_by_lenders,
   );
   // Step 3: Update the receivable amount monthly by lenders
   loan.receivable_amount_monthly_by_lenders = loan.lenders_capital_invested.map(
@@ -136,12 +136,12 @@ async function processPaymentWithVariedLiquidationFactor(
         remaining_amount:
           lender.remaining_amount - (interestForLender + principalForLender), // Keep track of the remaining amount for the lender
       };
-    }
+    },
   );
 
   // Note: receivable_amount_By_lenders should stay as it is (only storing ObjectId references).
   loan.receivable_amount_By_lenders = loan.lenders_capital_invested.map(
-    (lender) => lender.amount
+    (lender) => lender.amount,
   );
 
   // Step 4: Calculate loan repayment percentage
@@ -165,7 +165,7 @@ async function processPaymentWithVariedLiquidationFactor(
     loan.lenders_capital_invested.map(async (lender) => {
       const user = await User.findById(lender.user_id);
       const userInvestment = user.investments.find(
-        (investment) => investment.loan_id.toString() === loanId.toString()
+        (investment) => investment.loan_id.toString() === loanId.toString(),
       );
 
       if (userInvestment) {
@@ -175,7 +175,7 @@ async function processPaymentWithVariedLiquidationFactor(
       }
 
       await user.save();
-    })
+    }),
   );
 
   // Save the loan with the updated fields

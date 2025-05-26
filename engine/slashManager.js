@@ -1,5 +1,5 @@
 const cron = require("node-cron");
-const Loan = require("../schema/LoaningSchema"); 
+const Loan = require("../schema/LoaningSchema");
 const User = require("../schema/UserSchema");
 
 cron.schedule("0 0 * * *", async () => {
@@ -20,7 +20,7 @@ cron.schedule("0 0 * * *", async () => {
         const returnAbleAMounts = loan.lenders_capital_invested.map(
           (lender) => {
             return lender.remaining_amount;
-          }
+          },
         );
 
         const userAddresses = loan.lenders_capital_invested.map(
@@ -28,7 +28,7 @@ cron.schedule("0 0 * * *", async () => {
             const userId = lender.user_id;
             const user = await User.findById(userId).select("user_address");
             return user.user_address;
-          }
+          },
         );
 
         if (loan.months_not_paid > 3) {

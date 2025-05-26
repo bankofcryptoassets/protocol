@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 const Lend = require("./LendingSchema");
 
 const BorrowingSchema = new mongoose.Schema({
-  loan_id : { type: String, required: true },
+  loan_id: { type: String, required: true },
   user_id: { type: mongoose.Types.ObjectId, required: true, ref: "User" },
   user_address: { type: String, required: true },
   loan_amount: { type: Number, required: true },
@@ -17,7 +17,7 @@ const BorrowingSchema = new mongoose.Schema({
   asset_price: { type: Number, required: true }, // price of BTC, ETH loan opened at
   asset_released_per_month: { type: Number, required: true }, // amount of BTC, ETH released per month
 
-  chain_id : { type: Number, required: true },
+  chain_id: { type: Number, required: true },
   interest_rate: { type: Number, required: true },
   loan_duration: { type: Number, required: true },
   number_of_monthly_installments: { type: Number, required: true },
@@ -69,9 +69,9 @@ const BorrowingSchema = new mongoose.Schema({
       duePrincipal: { type: Number, required: true },
       dueInterest: { type: Number, required: true },
       paid: { type: Boolean, required: true },
-    }
+    },
   ],
-  liquidation_price : { type: Number },
+  liquidation_price: { type: Number },
   is_active: { type: Boolean, required: true },
   is_liquidated: { type: Boolean, default: false },
   is_repaid: { type: Boolean, default: false },

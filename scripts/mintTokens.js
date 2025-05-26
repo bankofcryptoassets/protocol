@@ -15,9 +15,13 @@ async function main() {
 
   // Mint 100 million USDC (6 decimals), 0 BTC (skip)
   const amountUsdc = parseUnits("100000000", 6); // 10M USDC
-  const amountBtc = parseUnits("0", 8);         // No cbBTC
+  const amountBtc = parseUnits("0", 8); // No cbBTC
 
-  const tx = await mockDeployer.mintTestTokens(deployer.address, amountUsdc, amountBtc);
+  const tx = await mockDeployer.mintTestTokens(
+    deployer.address,
+    amountUsdc,
+    amountBtc,
+  );
   await tx.wait();
 
   // Optionally check USDC balance
