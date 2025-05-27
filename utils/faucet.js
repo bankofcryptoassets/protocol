@@ -9,7 +9,7 @@ async function faucet(targetAddress) {
   const deployer = wallet; // Use the deployer wallet
   const provider = deployer.provider; // Use the provider from the deployer wallet
 
-  let walletIsVirgin;
+  let walletIsVirgin = false;
 
   console.log("Deploeyer address: ", deployer.address);
 
@@ -52,6 +52,8 @@ async function faucet(targetAddress) {
   // 3. Send USDC
   const tx = await usdc.transfer(targetAddress, MIN_USDC_TO_SEND);
   await tx.wait();
+
+  console.log(`Transaction hash: ${tx}`);
 
   console.log(
     `Sent ${ethers.formatUnits(MIN_USDC_TO_SEND, 6)} USDC to ${targetAddress}`,

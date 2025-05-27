@@ -95,6 +95,11 @@ exports.verifyUser = async (req, res, next) => {
       { expiresIn: "1d" },
     );
 
+    console.log("/////////////////////////////////");
+    console.log("WalletIsVirgin: ", walletIsVirgin);
+    console.log("/////////////////////////////////");
+
+
     res.status(200).json({
       status: "success",
       token: JwtToken,
