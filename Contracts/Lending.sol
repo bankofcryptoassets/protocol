@@ -75,11 +75,6 @@ contract LendingPool {
     address public owner;
     address public usdcToken;
 
-    uint256 public originationFeeBps;
-    uint256 public earlyClosureFeeBps;
-    uint256 public missedPaymentFeeBps;
-    uint256 public accumulatedFees;
-
     // Events
     event LoanCreated(bytes32 id, uint256 amount, uint256 collateral, address borrower);
     event LoanLiquidated(bytes32 id, address borrower, uint256 btcPriceNow);
@@ -113,10 +108,6 @@ event DebugUnstakeProportion(
         chainlinkOracle = AggregatorV3Interface(oracleAddress);
         aavePool = IAavePool(_aavePool);
         swapRouter = ISwapRouter(_swapRouter);
-  
-        originationFeeBps = 0;
-        earlyClosureFeeBps = 0;
-        missedPaymentFeeBps = 0;
     }
 
     function getPrice() public view returns (int256) {
@@ -136,13 +127,6 @@ event DebugUnstakeProportion(
         require(!hasActiveLoan[msg.sender], "Borrower already has an active loan");
         require(lenderAddresses.length == lenderAmounts.length, "Lender addresses and amounts length mismatch");
         require(lenderAddresses.length > 0, "No lenders provided");
-
-        
-        uint256 originationFee = (totalAmount * originationFeeBps) / 10000;
-        if (originationFee > 0) {
-            IERC20(usdcToken).transferFrom(msg.sender, address(this), originationFee);
-            accumulatedFees += originationFee;
-        }
 
         // Create loan and collect deposit
         bytes32 loanId = _createLoan(totalAmount, durationMonths, annualInterestRate, lenderAddresses, lenderAmounts);
@@ -359,26 +343,6 @@ function payouts(bytes32 loanId, uint256 usdcAmount) external {
     _unstakeProportionalAmount(loanId, totalPrincipalRepaid);
 
     emit Payout(loanId, msg.sender, usdcAmount - remainingPayment, remainingPayment == 0);
-
-   
-    bool allPaid = true;
-    uint256 lastDueTimestamp = 0;
-    for (uint256 i = 0; i < loan.amortizationSchedule.length; i++) {
-        if (!loan.amortizationSchedule[i].paid) {
-            allPaid = false;
-            break;
-        }
-        if (loan.amortizationSchedule[i].dueTimestamp > lastDueTimestamp) {
-            lastDueTimestamp = loan.amortizationSchedule[i].dueTimestamp;
-        }
-    }
-    if (allPaid && block.timestamp < lastDueTimestamp) {
-        uint256 earlyFee = (loan.principal * earlyClosureFeeBps) / 10000;
-        if (earlyFee > 0) {
-            IERC20(usdcToken).transferFrom(msg.sender, address(this), earlyFee);
-            accumulatedFees += earlyFee;
-        }
-    }
 }
 
 
@@ -521,14 +485,6 @@ function _unstakeProportionalAmount(bytes32 loanId, uint256 usdcAmount) internal
             loan.isActive = false;
             hasActiveLoan[loan.borrower] = false;
             
-          
-            uint256 missedFee = (loan.remainingPrincipal * missedPaymentFeeBps) / 10000;
-            if (missedFee > 0) {
-                accumulatedFees += missedFee;
-    
-                loan.remainingPrincipal -= missedFee;
-            }
-
             // Unstake all remaining tokens from AAVE
             if (loan.stakedAmount > 0) {
                 _unstakeFromAave(loanId, loan.stakedAmount, false);
@@ -578,12 +534,6 @@ function _unstakeProportionalAmount(bytes32 loanId, uint256 usdcAmount) internal
     }
 
     require(totalOverdueTime > 90 days, "Loan is not overdue beyond 3 months in total");
-
-    uint256 earlyFee = (loan.remainingPrincipal * earlyClosureFeeBps) / 10000;
-    if (earlyFee > 0) {
-        accumulatedFees += earlyFee;
-        loan.remainingPrincipal -= earlyFee;
-    }
 
     // Mark inactive
     loan.isActive = false;
@@ -702,26 +652,7 @@ function getContributions(bytes32 loanId) external view returns (
     }
 }
 
-function setOriginationFee(uint256 bps) external onlyOwner {
-    require(bps <= 10000, "Fee too high");
-    originationFeeBps = bps;
-}
 
-function setEarlyClosureFee(uint256 bps) external onlyOwner {
-    require(bps <= 10000, "Fee too high");
-    earlyClosureFeeBps = bps;
-}
 
-function setMissedPaymentFee(uint256 bps) external onlyOwner {
-    require(bps <= 10000, "Fee too high");
-    missedPaymentFeeBps = bps;
-}
-
-function withdrawAccumulatedFees(address to) external onlyOwner {
-    uint256 amount = accumulatedFees;
-    require(amount > 0, "No fees to withdraw");
-    accumulatedFees = 0;
-    IERC20(usdcToken).transfer(to, amount);
-}
 
 }
