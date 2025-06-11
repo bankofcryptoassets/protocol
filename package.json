@@ -5,7 +5,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "biome check ./",
-    "lint:fix": "biome check --write ."
+    "lint:fix": "biome check --write .",
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
   "keywords": [],
   "author": "",
@@ -32,6 +34,7 @@
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "chai": "^4.5.0",
     "ethers": "^6.13.4",
-    "hardhat": "^2.22.17"
+    "hardhat": "^2.22.17",
+    "nodemon": "^3.1.10"
   }
 }

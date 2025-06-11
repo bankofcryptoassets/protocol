@@ -10,6 +10,7 @@ const loanRouter = require("./routes/loanRouter");
 const paymentRouter = require("./routes/paymentRouter");
 const lendingRouter = require("./routes/lendRouter");
 const loanInitialisationRouter = require("./routes/initialisationRouter");
+const insuranceRouter = require("./routes/insuranceRouter");
 
 const { seralizeUser } = require("./controllers/authController");
 const { recordDeposit } = require("./Listeners/deposit");
@@ -58,6 +59,7 @@ app.use("/api/loan", loanRouter);
 app.use("/api/payment", paymentRouter);
 app.use("/api/lending", lendingRouter);
 app.use("/api/initialisation", loanInitialisationRouter);
+app.use("/api/insurance", insuranceRouter);
 
 app.get("/", async (req, res) => {
   return res.json({ message: "Hello World" });
