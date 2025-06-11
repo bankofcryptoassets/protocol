@@ -75,6 +75,11 @@ contract LendingPool {
     address public owner;
     address public usdcToken;
 
+    // Pooling variables
+    mapping(address => uint256) public lenderPoolBalance;
+    uint256 public totalPoolBalance;
+
+    // Fee parameters (in basis points, 1% = 100)
     uint256 public originationFeeBps;
     uint256 public earlyClosureFeeBps;
     uint256 public missedPaymentFeeBps;
@@ -127,35 +132,33 @@ event DebugUnstakeProportion(
     function loan(
         uint256 totalAmount, 
         uint256 durationMonths, 
-        uint256 annualInterestRate, 
-        address[] calldata lenderAddresses, 
-        uint256[] calldata lenderAmounts
+        uint256 annualInterestRate
     ) external {
         require(totalAmount > 0, "Invalid amount");
         require(durationMonths > 0, "Invalid duration");
         require(!hasActiveLoan[msg.sender], "Borrower already has an active loan");
-        require(lenderAddresses.length == lenderAmounts.length, "Lender addresses and amounts length mismatch");
-        require(lenderAddresses.length > 0, "No lenders provided");
-
+        require(totalPoolBalance >= totalAmount, "Insufficient pool liquidity");
         
+        // Origination fee
         uint256 originationFee = (totalAmount * originationFeeBps) / 10000;
         if (originationFee > 0) {
             IERC20(usdcToken).transferFrom(msg.sender, address(this), originationFee);
             accumulatedFees += originationFee;
         }
 
+        // Withdraw from AAVE pool for the loan
+        uint256 withdrawn = aavePool.withdraw(usdcToken, totalAmount, address(this));
+        require(withdrawn == totalAmount, "Withdraw mismatch");
+        totalPoolBalance -= totalAmount;
+
         // Create loan and collect deposit
-        bytes32 loanId = _createLoan(totalAmount, durationMonths, annualInterestRate, lenderAddresses, lenderAmounts);
-        
-        // Loan is created, now transfer the loan amount to the borrower
+        bytes32 loanId = _createLoan(totalAmount, durationMonths, annualInterestRate);
         Loan storage newLoan = loans[loanId];
         
         // Swap USDC to cbBTC
         uint256 cbBtcAmount = _swapUsdcToCbBtc(newLoan.totalAmount);
-        
         // Stake cbBTC to AAVE
         _stakeCbBtcToAave(loanId, cbBtcAmount);
-        
         emit LoanCreated(loanId, totalAmount, newLoan.borrowerDeposit, msg.sender);
     }
     
@@ -206,16 +209,12 @@ function _swapUsdcToCbBtc(uint256 usdcAmount) internal returns (uint256) {
     function _createLoan(
         uint256 totalAmount, 
         uint256 durationMonths, 
-        uint256 annualInterestRate,
-        address[] calldata lenderAddresses,
-        uint256[] calldata lenderAmounts
+        uint256 annualInterestRate
     ) internal returns (bytes32) {
         uint256 borrowerDeposit = (totalAmount * 20) / 100;
         uint256 lenderPrincipal = totalAmount - borrowerDeposit;
-
         // Transfer the borrower's deposit
         IERC20(usdcToken).transferFrom(msg.sender, address(this), borrowerDeposit);
-
         // Create loan ID
         bytes32 loanId = keccak256(abi.encodePacked(msg.sender, block.timestamp));
         Loan storage newLoan = loans[loanId];
@@ -230,49 +229,13 @@ function _swapUsdcToCbBtc(uint256 usdcAmount) internal returns (uint256) {
         newLoan.btcPriceAtCreation = uint256(getPrice());
         newLoan.isActive = true;
         newLoan.remainingPrincipal = lenderPrincipal;
-        
-        // Collect funds from the provided lenders
-        uint256 collected = 0;
-        
-        for (uint256 i = 0; i < lenderAddresses.length; i++) {
-            address lender = lenderAddresses[i];
-            uint256 amount = lenderAmounts[i];
-            
-            require(amount > 0, "Invalid lender amount");
-            
-            // Transfer funds from lender to contract
-            IERC20(usdcToken).transferFrom(lender, address(this), amount);
-            
-            collected += amount;
-            
-            // Update lender's total contributed
-            lenders[lender].totalContributed += amount;
-            
-            // Calculate interest for this lender
-            uint256 interestReceivable = (amount * annualInterestRate * durationMonths) / (12 * 100);
-            
-            // Add contribution to loan
-            newLoan.contributions.push(LenderContribution({
-                lender: lender,
-                amount: amount,
-                receivableInterest: interestReceivable,
-                repaidPrincipal: 0,
-                repaidInterest: 0
-            }));
-        }
-        
-        require(collected == lenderPrincipal, "Collected amount doesn't match principal");
-
         // Calculate monthly payment
         uint256 monthlyRate = (annualInterestRate * 1e18) / (12 * 100);
         newLoan.monthlyPayment = (lenderPrincipal * monthlyRate) / (1e18 - (1e18 / (1e18 + monthlyRate)) ** durationMonths);
-        
         // Create amortization schedule
         _createAmortizationSchedule(loanId, lenderPrincipal, monthlyRate, durationMonths);
-        
         loanIds.push(loanId);
         hasActiveLoan[msg.sender] = true;
-        
         return loanId;
     }
     
@@ -331,36 +294,31 @@ function payouts(bytes32 loanId, uint256 usdcAmount) external {
     Loan storage loan = loans[loanId];
     require(loan.isActive, "Loan is not active");
     require(msg.sender == loan.borrower, "Only borrower can repay");
-
-    // ✅ Ensure this is here!
     IERC20(usdcToken).transferFrom(msg.sender, address(this), usdcAmount);
-
     uint256 remainingPayment = usdcAmount;
     uint256 totalPrincipalRepaid = 0;
-
     for (uint256 i = 0; i < loan.amortizationSchedule.length && remainingPayment > 0; i++) {
         Installment storage installment = loan.amortizationSchedule[i];
         require(installment.duePrincipal > 0, "Installment already paid");
         if (installment.paid) continue;
-
         uint256 installmentTotal = installment.duePrincipal + installment.dueInterest;
-
         if (remainingPayment >= installmentTotal) {
             remainingPayment -= installmentTotal;
             totalPrincipalRepaid += installment.duePrincipal;
-
-            distributePaymentToLenders(loan, installment.duePrincipal, installment.dueInterest);
             installment.paid = true;
-
             emit InstallmentPaid(loanId, i);
         }
     }
-
+    // Restake repayment into AAVE pool
+    uint256 restakeAmount = usdcAmount - remainingPayment;
+    if (restakeAmount > 0) {
+        IERC20(usdcToken).approve(address(aavePool), restakeAmount);
+        aavePool.supply(usdcToken, restakeAmount, address(this), 0);
+        totalPoolBalance += restakeAmount;
+    }
     _unstakeProportionalAmount(loanId, totalPrincipalRepaid);
-
     emit Payout(loanId, msg.sender, usdcAmount - remainingPayment, remainingPayment == 0);
-
-   
+    // Early closure fee logic remains unchanged
     bool allPaid = true;
     uint256 lastDueTimestamp = 0;
     for (uint256 i = 0; i < loan.amortizationSchedule.length; i++) {
@@ -722,6 +680,26 @@ function withdrawAccumulatedFees(address to) external onlyOwner {
     require(amount > 0, "No fees to withdraw");
     accumulatedFees = 0;
     IERC20(usdcToken).transfer(to, amount);
+}
+
+// --- Lender Pool Deposit/Withdraw ---
+function depositToPool(uint256 amount) external {
+    require(amount > 0, "Amount must be > 0");
+    IERC20(usdcToken).transferFrom(msg.sender, address(this), amount);
+    IERC20(usdcToken).approve(address(aavePool), amount);
+    aavePool.supply(usdcToken, amount, address(this), 0);
+    lenderPoolBalance[msg.sender] += amount;
+    totalPoolBalance += amount;
+}
+
+function withdrawFromPool(uint256 amount) external {
+    require(amount > 0, "Amount must be > 0");
+    require(lenderPoolBalance[msg.sender] >= amount, "Insufficient pool balance");
+    lenderPoolBalance[msg.sender] -= amount;
+    totalPoolBalance -= amount;
+    uint256 withdrawn = aavePool.withdraw(usdcToken, amount, address(this));
+    require(withdrawn == amount, "Withdraw mismatch");
+    IERC20(usdcToken).transfer(msg.sender, amount);
 }
 
 }
