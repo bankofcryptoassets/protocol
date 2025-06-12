@@ -2,6 +2,19 @@ const DeribitService = require('./deribitService');
 const Insurance = require('../schema/InsuranceSchema');
 const Loan = require('../schema/LoaningSchema');
 const { getBTCRate } = require('../utils/getPrice');
+const User = require('../schema/UserSchema');
+
+// Helper function to get the last Friday of a given month
+function getLastFridayOfMonth(year, month) {
+  // Get the last day of the month
+  const lastDay = new Date(year, month + 1, 0);
+  // Get the day of the week (0 = Sunday, 5 = Friday)
+  const dayOfWeek = lastDay.getDay();
+  // Calculate how many days to go back to get to the last Friday
+  const daysToSubtract = (dayOfWeek + 2) % 7;
+  // Create new date for the last Friday
+  return new Date(year, month, lastDay.getDate() - daysToSubtract);
+}
 
 class InsuranceService {
   constructor() {
@@ -12,65 +25,104 @@ class InsuranceService {
   }
 
   async calculateInsuranceDetails(loanId) {
-    const loan = await Loan.findById(loanId);
-    if (!loan) throw new Error('Loan not found');
+    try {
+      const loan = await Loan.findById(loanId);
+      if (!loan) throw new Error('Loan not found');
+  
+      const btcPrice = loan.asset_price;
+      const insuredAmount = loan.remaining_amount - loan.up_front_payment;
+      const btcQuantity = 0.1//insuredAmount / btcPrice;
+      if (btcQuantity < 0.1) {
+        throw new Error('BTC quantity is too low');
+      }
+      let calculatedStrikePrice = (insuredAmount / btcQuantity);
 
-    const btcPrice = await getBTCRate(1); // Get current BTC price TODO: change this to price of btc during the loan initiation
-    const insuredAmount = loan.loan_amount - loan.up_front_payment;
-    const btcQuantity = insuredAmount / btcPrice;
-    const strikePrice = (insuredAmount / btcQuantity);
+      // Calculate expiry date based on current date
+      const today = new Date();
+      let expiryDate;
+      if (today.getDate() <= 20) {
+        // Expire at last Friday of current month
+        expiryDate = getLastFridayOfMonth(today.getFullYear(), today.getMonth());
+      } else {
+        // Expire at last Friday of next month
+        expiryDate = getLastFridayOfMonth(today.getFullYear(), today.getMonth() + 1);
+      }
 
-    // Calculate expiry date based on current date
-    const today = new Date();
-    let expiryDate;
-    if (today.getDate() <= 20) {
-      // Expire at end of current month
-      expiryDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    } else {
-      // Expire at end of next month
-      expiryDate = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+      // Get option price from Deribit
+      const monthStr = expiryDate.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+      const dayStr = expiryDate.getDate().toString();
+      const yearStr = expiryDate.getFullYear().toString().slice(-2);
+      const instrumentNameWithoutStrike = `BTC-${dayStr}${monthStr}${yearStr}`;
+      // Get all BTC put options
+      const instruments = await this.deribit.getInstruments('BTC', 'option');
+    
+
+        // Filter for PUT options only and find the closest strike price
+        const suitableOptions = instruments.result
+        .filter(inst => inst.instrument_name.startsWith(instrumentNameWithoutStrike))
+        .filter(inst => inst.instrument_name.endsWith('-P'))
+
+        const putOptionsStrike = suitableOptions.map(inst => ({
+          ...inst,
+          strikeDiff: Math.abs(inst.strike - calculatedStrikePrice)
+        }))
+        .sort((a, b) => a.strikeDiff - b.strikeDiff);
+
+      // Get the option with strike price closest to our target
+      const closestOption = putOptionsStrike[0];
+      if (!closestOption) {
+        throw new Error('No suitable PUT options found');
+      }
+  
+      // Ensure we meet minimum trade amount
+      const minTradeAmount = closestOption.min_trade_amount || 0.1; // Default to 0.1 if not specified
+      const adjustedBtcQuantity = Math.max(btcQuantity, minTradeAmount);
+  
+      return {
+        insuredAmount,
+        strikePrice:closestOption.strike,
+        expiryDate: new Date(closestOption.expiration_timestamp),
+        instrumentName: closestOption.instrument_name,
+        btcQuantity: adjustedBtcQuantity
+      };
+    } catch (error) {
+      console.log(error);
+      throw new Error('Failed to calculate insurance details');
     }
-
-    // Get option price from Deribit
-    const instrumentName = `BTC-${expiryDate.toISOString().slice(0, 10)}-${strikePrice}-P`;
-    const optionPrice = await this.deribit.getOptionPrice(instrumentName);
-
-    const monthlyPremium = optionPrice.result.mark_price * btcQuantity;
-
-    return {
-      insuredAmount,
-      strikePrice,
-      expiryDate,
-      monthlyPremium,
-      instrumentName,
-      btcQuantity
-    };
   }
 
-  async purchaseInsurance(loanId, userId, userAddress) {
-    const insuranceDetails = await this.calculateInsuranceDetails(loanId);
-    
-    // Purchase PUT option on Deribit
-    const putOption = await this.deribit.buyPutOption(
-      insuranceDetails.instrumentName,
-      insuranceDetails.btcQuantity,
-      insuranceDetails.monthlyPremium
-    );
-
-    // Create insurance record
-    const insurance = await Insurance.create({
-      loan_id: loanId,
-      user_id: userId,
-      user_address: userAddress,
-      insured_amount: insuranceDetails.insuredAmount,
-      strike_price: insuranceDetails.strikePrice,
-      expiry_date: insuranceDetails.expiryDate,
-      put_option_id: putOption.result.order.order_id,
-      premium_rate: insuranceDetails.monthlyPremium / insuranceDetails.insuredAmount,
-      monthly_premium: insuranceDetails.monthlyPremium
-    });
-
-    return insurance;
+  async purchaseInsurance(loanId, userAddress) {
+    try {
+      const insuranceDetails = await this.calculateInsuranceDetails(loanId);
+      // Purchase PUT option on Deribit
+      const putOption = await this.deribit.buyPutOption(
+        insuranceDetails.instrumentName,
+        insuranceDetails.btcQuantity,
+      );
+      
+      // get user from user address
+      const user = await User.findOne({ user_address: userAddress });
+      if (!user) {
+        throw new Error('User not found');
+      }
+      // Create insurance record
+      const insurance = await Insurance.create({
+        loan_id: loanId,
+        user_id: user._id,
+        user_address: userAddress,
+        insured_amount: insuranceDetails.insuredAmount,
+        strike_price: insuranceDetails.strikePrice,
+        expiry_date: insuranceDetails.expiryDate,
+        btc_quantity: insuranceDetails.btcQuantity,
+        put_option_id: putOption.result.order.order_id,
+        instrument_name: insuranceDetails.instrumentName,
+      });
+  
+      return insurance;
+    } catch (error) {
+      console.log(error);
+      throw new Error('Failed to purchase insurance');
+    }
   }
 
   async rolloverInsurance(insuranceId) {
@@ -86,20 +138,20 @@ class InsuranceService {
       0 // Market order
     );
 
-    // Calculate new expiry
-    const today = new Date();
-    const expiryDate = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+    const newLoanDetails = await this.calculateInsuranceDetails(insurance.loan_id);
 
     // Purchase new PUT option
-    const newInstrumentName = `BTC-${expiryDate.toISOString().slice(0, 10)}-${insurance.strike_price}-P`;
     const putOption = await this.deribit.buyPutOption(
-      newInstrumentName,
-      insurance.btc_quantity,
-      insurance.monthly_premium
+      newLoanDetails.instrumentName,
+      newLoanDetails.btcQuantity,
     );
 
     // Update insurance record
-    insurance.expiry_date = expiryDate;
+    insurance.expiry_date = newLoanDetails.expiryDate;
+    insurance.btc_quantity = newLoanDetails.btcQuantity;
+    insurance.instrument_name = newLoanDetails.instrumentName;
+    insurance.strike_price = newLoanDetails.strikePrice;
+    insurance.insured_amount = newLoanDetails.insuredAmount;
     insurance.put_option_id = putOption.result.order.order_id;
     insurance.updated_at = new Date();
     await insurance.save();
@@ -113,11 +165,11 @@ class InsuranceService {
       throw new Error('Insurance not found or inactive');
     }
 
+    console.log(insurance);
     // Close position on Deribit
     await this.deribit.sellPutOption(
       insurance.instrument_name,
       insurance.btc_quantity,
-      0 // Market order
     );
 
     // Update insurance record

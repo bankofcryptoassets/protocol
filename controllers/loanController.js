@@ -94,6 +94,16 @@ const getLoanById = async (req, res) => {
   }
 };
 
+const getLoanByAddress = async (req, res) => {
+  try {
+    const { address } = req.params;
+    const loan = await Loan.find({ user_address: address });
+    return res.json({ loan });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 // const updateLoan = async (req, res) => {
 //   try {
 //     const { id } = req.params;
@@ -179,4 +189,5 @@ module.exports = {
   getLoanById,
   initialDetails,
   matchLenders,
+  getLoanByAddress,
 };

@@ -32,11 +32,11 @@ const InsuranceSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    premium_rate: {
-      type: Number,
+    instrument_name: {
+      type: String,
       required: true,
     },
-    monthly_premium: {
+    btc_quantity: {
       type: Number,
       required: true,
     },

@@ -5,7 +5,7 @@ class DeribitService {
   constructor(apiKey, apiSecret) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
-    this.baseUrl = 'https://www.deribit.com/api/v2';
+    this.baseUrl = 'https://test.deribit.com/api/v2';
   }
 
   generateSignature(timestamp, method, path, params = {}) {
@@ -16,6 +16,7 @@ class DeribitService {
   async request(method, path, params = {}) {
     const timestamp = Date.now();
     const signature = this.generateSignature(timestamp, method, path, params);
+    const basicAuth = Buffer.from(`${this.apiKey}:${this.apiSecret}`).toString('base64');
 
     try {
       const response = await axios({
@@ -23,9 +24,14 @@ class DeribitService {
         url: `${this.baseUrl}${path}`,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `deri-hmac-sha256 id=${this.apiKey},ts=${timestamp},sig=${signature}`
+          'Authorization': `Basic ${basicAuth}`
         },
-        data: method === 'GET' ? undefined : params,
+        data: method === 'GET' ? undefined : {
+          params,
+          method: path,
+          jsonrpc: '2.0',
+          id: 1
+        },
         params: method === 'GET' ? params : undefined
       });
       return response.data;
@@ -39,21 +45,26 @@ class DeribitService {
     return this.request('GET', '/public/get_instrument', { instrument_name: instrumentName });
   }
 
-  async buyPutOption(instrumentName, amount, price) {
+  async buyPutOption(instrumentName, amount) {
     return this.request('POST', '/private/buy', {
+      
       instrument_name: instrumentName,
       amount: amount,
-      type: 'limit',
-      price: price
+      type: 'market',
+      otoco_config:[]
     });
+  }
+
+  async listApikeys() {
+    return this.request('GET', '/private/list_api_keys');
   }
 
   async sellPutOption(instrumentName, amount, price) {
     return this.request('POST', '/private/sell', {
       instrument_name: instrumentName,
       amount: amount,
-      type: 'limit',
-      price: price
+      type: 'market',
+      otoco_config:[]
     });
   }
 
