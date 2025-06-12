@@ -2,6 +2,9 @@
 
 This project provides the backend for interacting with the Zeistal platform. The API allows users to authenticate, lend, get liquidity, borrow, and interact with contracts with the respinses. All of the calculations are handled here with the responses serving as the indexable data points without any calculations required.
 
+#### LP ADDRESS 
+`0xb556F608bf4871f2Cd2A8E59B29ADC18df6a817e`
+
 ## Installation
 
 To install the project, run the following command:
