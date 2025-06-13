@@ -31,9 +31,10 @@ class InsuranceService {
   
       const btcPrice = loan.asset_price;
       const insuredAmount = loan.remaining_amount - loan.up_front_payment;
-      const btcQuantity = insuredAmount / btcPrice; //TODO remove this
+      let btcQuantity = insuredAmount / btcPrice; //TODO remove this
       if (btcQuantity < 0.1) {
-        throw new Error('BTC quantity is too low');
+        //throw new Error('BTC quantity is too low');
+        btcQuantity = 0.1;
       }
       let calculatedStrikePrice = (insuredAmount / btcQuantity);
 
@@ -87,7 +88,7 @@ class InsuranceService {
       };
     } catch (error) {
       console.log(error);
-      throw new Error('Failed to calculate insurance details');
+      throw new Error(error.message);
     }
   }
 
