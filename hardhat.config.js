@@ -13,6 +13,9 @@ module.exports = {
       viaIR: true, // Use the IR pipeline
     },
   },
+  paths: {
+    sources: "./Contracts",
+  },
   networks: {
     hardhat: {
       chainId: 1337,

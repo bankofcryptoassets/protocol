@@ -31,7 +31,7 @@ class InsuranceService {
   
       const btcPrice = loan.asset_price;
       const insuredAmount = loan.remaining_amount - loan.up_front_payment;
-      const btcQuantity = 0.1//insuredAmount / btcPrice;
+      const btcQuantity = insuredAmount / btcPrice; //TODO remove this
       if (btcQuantity < 0.1) {
         throw new Error('BTC quantity is too low');
       }
