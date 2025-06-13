@@ -18,6 +18,8 @@ const { recordLoanEvents } = require("./Listeners/loan");
 const { recordPayoutEvents } = require("./Listeners/payment");
 const { runAutoPayout } = require("./engine/autoPayCron");
 
+require("dotenv").config();
+
 const app = express();
 connectDB();
 
@@ -65,6 +67,7 @@ app.get("/", async (req, res) => {
   return res.json({ message: "Hello World" });
 });
 
-app.listen(5001, () => {
-  console.log("Server started on port 5001");
+const port = process.env.PORT || 5005;
+app.listen(port, () => {
+  console.log(`Server started on port ${port}`);
 });
