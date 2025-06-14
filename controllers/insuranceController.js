@@ -20,8 +20,7 @@ exports.purchaseInsurance = async (req, res) => {
   try {
     const { loanId } = req.params;
     // TODO: update smart contract
-    const userAddress = req.body.userAddress;
-    const insurance = await insuranceService.purchaseInsurance(loanId, userAddress);
+    const insurance = await insuranceService.purchaseInsurance(loanId);
     res.status(200).json({
       status: 'success',
       data: insurance
@@ -68,7 +67,8 @@ exports.getInsuranceDetails = async (req, res) => {
 
 exports.getAllActiveInsurances = async (req, res) => {
   try {
-    const insurances = await insuranceService.getActiveInsurances();
+    const userId = req.query.userId;
+    const insurances = await insuranceService.getActiveInsurancesForUser(userId);
     res.status(200).json({
       status: 'success',
       data: insurances

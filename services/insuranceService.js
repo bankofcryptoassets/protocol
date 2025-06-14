@@ -29,7 +29,7 @@ class InsuranceService {
       const loan = await Loan.findById(loanId);
       if (!loan) throw new Error('Loan not found');
   
-      const btcPrice = loan.asset_price;
+      const btcPrice = loan.asset_price; // the price of the btc when loan is placed
       const insuredAmount = loan.remaining_amount - loan.up_front_payment;
       let btcQuantity = insuredAmount / btcPrice; //TODO remove this
       if (btcQuantity < 0.1) {
@@ -77,14 +77,17 @@ class InsuranceService {
   
       // Ensure we meet minimum trade amount
       const minTradeAmount = closestOption.min_trade_amount || 0.1; // Default to 0.1 if not specified
-      const adjustedBtcQuantity = Math.max(btcQuantity, minTradeAmount);
-  
+      let adjustedBtcQuantity = Math.max(btcQuantity, minTradeAmount);
+      // Adjust quantity to be a multiple of minTradeAmount and round to 2 decimal places
+      adjustedBtcQuantity = Number((Math.ceil(adjustedBtcQuantity / minTradeAmount) * minTradeAmount).toFixed(2));
       return {
         insuredAmount,
         strikePrice:closestOption.strike,
         expiryDate: new Date(closestOption.expiration_timestamp),
         instrumentName: closestOption.instrument_name,
-        btcQuantity: adjustedBtcQuantity
+        btcQuantity: adjustedBtcQuantity,
+        user_id: loan.user_id,
+        user_address: loan.user_address,
       };
     } catch (error) {
       console.log(error);
@@ -92,7 +95,7 @@ class InsuranceService {
     }
   }
 
-  async purchaseInsurance(loanId, userAddress) {
+  async purchaseInsurance(loanId) {
     try {
       const insuranceDetails = await this.calculateInsuranceDetails(loanId);
       // Purchase PUT option on Deribit
@@ -100,17 +103,12 @@ class InsuranceService {
         insuranceDetails.instrumentName,
         insuranceDetails.btcQuantity,
       );
-      
-      // get user from user address
-      const user = await User.findOne({ user_address: userAddress });
-      if (!user) {
-        throw new Error('User not found');
-      }
+
       // Create insurance record
       const insurance = await Insurance.create({
         loan_id: loanId,
-        user_id: user._id,
-        user_address: userAddress,
+        user_id: insuranceDetails.user_id,
+        user_address: insuranceDetails.user_address,
         insured_amount: insuranceDetails.insuredAmount,
         strike_price: insuranceDetails.strikePrice,
         expiry_date: insuranceDetails.expiryDate,
@@ -121,7 +119,7 @@ class InsuranceService {
   
       return insurance;
     } catch (error) {
-      console.log(error);
+      console.log('Failed to purchase insurance', error);
       throw new Error('Failed to purchase insurance');
     }
   }
@@ -182,8 +180,8 @@ class InsuranceService {
     return insurance;
   }
 
-  async getActiveInsurances() {
-    return Insurance.find({ is_active: true });
+  async getActiveInsurancesForUser(userId) {
+    return Insurance.find({ user_id: userId, is_active: true });
   }
 
   async getInsuranceByLoanId(loanId) {
