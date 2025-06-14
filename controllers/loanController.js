@@ -86,8 +86,12 @@ const getLoans = async (req, res) => {
 
 const getLoanById = async (req, res) => {
   try {
+    let loan;
     const { id } = req.params;
-    const loan = await Loan.findById(id);
+    loan = await Loan.findById(id);
+    if (!loan) {
+      loan = await Loan.findOne({ loan_id: id });
+    }
     return res.json({ loan });
   } catch (error) {
     return res.status(500).json({ error: error.message });
