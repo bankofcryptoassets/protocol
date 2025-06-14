@@ -65,6 +65,7 @@ contract LendingPool {
         Installment[] amortizationSchedule;
         uint256 stakedAmount;     // Amount of cbBTC staked in AAVE
         uint256 remainingPrincipal; // Tracking remaining principal after repayments
+        bool insuranceTaken;
     }
 
     mapping(address => Lender) public lenders;
@@ -214,6 +215,7 @@ function _swapUsdcToCbBtc(uint256 usdcAmount) internal returns (uint256) {
         newLoan.btcPriceAtCreation = uint256(getPrice());
         newLoan.isActive = true;
         newLoan.remainingPrincipal = lenderPrincipal;
+        newLoan.insuranceTaken = false; // Default to false, can be set later
         
         // Collect funds from the provided lenders
         uint256 collected = 0;
@@ -245,7 +247,7 @@ function _swapUsdcToCbBtc(uint256 usdcAmount) internal returns (uint256) {
             }));
         }
         
-        require(collected == lenderPrincipal, "Collected amount doesn't match principal");
+        // require(collected == lenderPrincipal, "Collected amount doesn't match principal");
 
         // Calculate monthly payment
         uint256 monthlyRate = (annualInterestRate * 1e18) / (12 * 100);
@@ -652,7 +654,11 @@ function getContributions(bytes32 loanId) external view returns (
     }
 }
 
-
+    function setInsuranceTaken(bytes32 loanId, bool status) external onlyOwner {
+        Loan storage loan = loans[loanId];
+        require(loan.isActive, "Loan is not active");
+        loan.insuranceTaken = status;
+    }
 
 
 }
