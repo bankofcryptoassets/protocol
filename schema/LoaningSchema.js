@@ -76,6 +76,7 @@ const BorrowingSchema = new mongoose.Schema({
   is_liquidated: { type: Boolean, default: false },
   is_repaid: { type: Boolean, default: false },
   is_defaulted: { type: Boolean, default: false },
+  allowances_updated: { type: Boolean, default: false },
 });
 
 const Loan = mongoose.model("Loan", BorrowingSchema);
