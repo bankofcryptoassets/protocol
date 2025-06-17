@@ -1,7 +1,7 @@
 {
   "_format": "hh-sol-artifact-1",
   "contractName": "IAavePool",
-  "sourceName": "Contracts/Lending.sol",
+  "sourceName": "contracts/Lending.sol",
   "abi": [
     {
       "inputs": [
