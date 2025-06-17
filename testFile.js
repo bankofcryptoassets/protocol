@@ -134,10 +134,10 @@ async function main() {
   console.log("Setting up a test loan...");
 
   // Calculate the amount of USDC needed for the loan
-  const loanAmount = parseUnits("50000", 6); // 50,000 USDC
-  const lender1Amount = parseUnits("20000", 6); // 20,000 USDC
-  const lender2Amount = parseUnits("20000", 6); // 20,000 USDC
-  const borrowerDeposit = (loanAmount * 20n) / 100n; // 20% deposit = 8,000 USDC
+  const loanAmount = parseUnits("105562.649", 6); // 105,562.649 USDC
+  const lender1Amount = parseUnits("84450.12", 6); // 84,450.12 USDC
+  // const lender2Amount = parseUnits("20000", 6); // 20,000 USDC
+  const borrowerDeposit = (loanAmount * 20n) / 100n; // 20% deposit = 21,112.53 USDC
 
   console.log(`Loan amount: ${formatUnits(loanAmount, 6)} USDC`);
   console.log(`Borrower deposit: ${formatUnits(borrowerDeposit, 6)} USDC`);
@@ -181,15 +181,15 @@ async function main() {
   console.log(`Approving lendingPool at address: ${lendingPoolAddress}`);
 
   await usdc.connect(lender1).approve(lendingPoolAddress, lender1Amount);
-  await usdc.connect(lender2).approve(lendingPoolAddress, lender2Amount);
+  // await usdc.connect(lender2).approve(lendingPoolAddress, lender2Amount);
   await usdc.connect(borrower).approve(lendingPoolAddress, borrowerDeposit);
 
   console.log(
     `Lender1 approved LendingPool to spend ${formatUnits(lender1Amount, 6)} USDC`,
   );
-  console.log(
-    `Lender2 approved LendingPool to spend ${formatUnits(lender2Amount, 6)} USDC`,
-  );
+  // console.log(
+  //   `Lender2 approved LendingPool to spend ${formatUnits(lender2Amount, 6)} USDC`,
+  // );
   console.log(
     `Borrower approved LendingPool to spend ${formatUnits(borrowerDeposit, 6)} USDC`,
   );
@@ -199,10 +199,10 @@ async function main() {
     lender1.address,
     lendingPoolAddress,
   );
-  const lender2Allowance = await usdc.allowance(
-    lender2.address,
-    lendingPoolAddress,
-  );
+  // const lender2Allowance = await usdc.allowance(
+  //   lender2.address,
+  //   lendingPoolAddress,
+  // );
   const borrowerAllowance = await usdc.allowance(
     borrower.address,
     lendingPoolAddress,
@@ -210,17 +210,17 @@ async function main() {
 
   console.log("Checking allowances to verify approvals:");
   console.log(`Lender1 allowance: ${formatUnits(lender1Allowance, 6)} USDC`);
-  console.log(`Lender2 allowance: ${formatUnits(lender2Allowance, 6)} USDC`);
+  // console.log(`Lender2 allowance: ${formatUnits(lender2Allowance, 6)} USDC`);
   console.log(`Borrower allowance: ${formatUnits(borrowerAllowance, 6)} USDC`);
 
   // Create the loan
   console.log("Creating loan...");
   const tx = await lendingPool.connect(borrower).loan(
     loanAmount, // Total loan amount (40,000 USDC)
-    12, // 12 months duration
-    10, // 10% annual interest rate
-    [lender1.address, lender2.address], // Lender addresses
-    [lender1Amount, lender2Amount], // Lender amounts
+    18, // 18 months duration
+    15, // 15% annual interest rate
+    [lender1.address], // Lender addresses
+    [lender1Amount], // Lender amounts
   );
 
   await tx.wait();
@@ -239,12 +239,12 @@ async function main() {
 
   // Check updated balances
   const updatedLender1Balance = await usdc.balanceOf(lender1.address);
-  const updatedLender2Balance = await usdc.balanceOf(lender2.address);
+  // const updatedLender2Balance = await usdc.balanceOf(lender2.address);
   const updatedBorrowerUsdcBalance = await usdc.balanceOf(borrower.address);
 
   console.log("Updated balances after loan creation:");
   console.log(`Lender1 USDC: ${formatUnits(updatedLender1Balance, 6)}`);
-  console.log(`Lender2 USDC: ${formatUnits(updatedLender2Balance, 6)}`);
+  // console.log(`Lender2 USDC: ${formatUnits(updatedLender2Balance, 6)}`);
   console.log(`Borrower USDC: ${formatUnits(updatedBorrowerUsdcBalance, 6)}`);
 
   const MockAavePool = await ethers.getContractFactory("MockAavePool");
@@ -257,96 +257,96 @@ async function main() {
 
   console.log("Test completed successfully! 🎉");
 
-  console.log("---------- STARTING REPAYMENT TEST ----------");
+  // console.log("---------- STARTING REPAYMENT TEST ----------");
 
-  const [principals, interests, paidStatuses] =
-    await lendingPool.getAmortizationSchedule(loanId);
-  console.log("Amortization schedule:");
-  console.log(
-    "Principals:",
-    principals.map((p) => ethers.formatUnits(p, 6)),
-  );
-  console.log(
-    "Interests:",
-    interests.map((i) => ethers.formatUnits(i, 6)),
-  );
-  console.log(
-    "Paid statuses:",
-    paidStatuses.map((s) => s.toString()),
-  );
-  console.log("Loan ID:", loanId);
+  // const [principals, interests, paidStatuses] =
+  //   await lendingPool.getAmortizationSchedule(loanId);
+  // console.log("Amortization schedule:");
+  // console.log(
+  //   "Principals:",
+  //   principals.map((p) => ethers.formatUnits(p, 6)),
+  // );
+  // console.log(
+  //   "Interests:",
+  //   interests.map((i) => ethers.formatUnits(i, 6)),
+  // );
+  // console.log(
+  //   "Paid statuses:",
+  //   paidStatuses.map((s) => s.toString()),
+  // );
+  // console.log("Loan ID:", loanId);
 
-  const lpBalanceBefore = await usdc.balanceOf(lendingPoolAddress);
-  console.log(
-    "LendingPool USDC balance before payout:",
-    formatUnits(lpBalanceBefore, 6),
-  );
+  // const lpBalanceBefore = await usdc.balanceOf(lendingPoolAddress);
+  // console.log(
+  //   "LendingPool USDC balance before payout:",
+  //   formatUnits(lpBalanceBefore, 6),
+  // );
 
-  // Approve repayment
-  const repaymentAmount = parseUnits("3517", 6); // First repayment
-  await usdc.connect(borrower).approve(lendingPoolAddress, repaymentAmount);
-  console.log(
-    `Borrower approved ${formatUnits(repaymentAmount, 6)} USDC for repayment`,
-  );
+  // // Approve repayment
+  // const repaymentAmount = parseUnits("3517", 6); // First repayment
+  // await usdc.connect(borrower).approve(lendingPoolAddress, repaymentAmount);
+  // console.log(
+  //   `Borrower approved ${formatUnits(repaymentAmount, 6)} USDC for repayment`,
+  // );
 
-  const allowance = await usdc.allowance(borrower.address, lendingPoolAddress);
-  console.log(`Borrower allowance: ${formatUnits(allowance, 6)} USDC`);
+  // const allowance = await usdc.allowance(borrower.address, lendingPoolAddress);
+  // console.log(`Borrower allowance: ${formatUnits(allowance, 6)} USDC`);
 
-  const borrowerBalance = await usdc.balanceOf(borrower.address);
-  console.log(`Borrower balance: ${formatUnits(borrowerBalance, 6)} USDC`);
+  // const borrowerBalance = await usdc.balanceOf(borrower.address);
+  // console.log(`Borrower balance: ${formatUnits(borrowerBalance, 6)} USDC`);
 
-  const debug = await lendingPool.debugUnstakeCalc(
-    loanId,
-    parseUnits("3183.3", 6),
-  ); // principal repaid in this payout
-  console.log(
-    `Proportion repaid: ${ethers.formatUnits(debug[0], 18)} (1.0 = fully repaid)`,
-  );
-  console.log(`cbBTC to unstake: ${ethers.formatUnits(debug[1], 8)} cbBTC`);
+  // const debug = await lendingPool.debugUnstakeCalc(
+  //   loanId,
+  //   parseUnits("3183.3", 6),
+  // ); // principal repaid in this payout
+  // console.log(
+  //   `Proportion repaid: ${ethers.formatUnits(debug[0], 18)} (1.0 = fully repaid)`,
+  // );
+  // console.log(`cbBTC to unstake: ${ethers.formatUnits(debug[1], 8)} cbBTC`);
 
-  const stakedBefore = await lendingPool.getStakedAmount(loanId);
-  console.log(
-    `Staked amount before repayment: ${ethers.formatUnits(stakedBefore, 8)} cbBTC`,
-  );
+  // const stakedBefore = await lendingPool.getStakedAmount(loanId);
+  // console.log(
+  //   `Staked amount before repayment: ${ethers.formatUnits(stakedBefore, 8)} cbBTC`,
+  // );
 
-  // Call payouts
-  const payoutTx = await lendingPool
-    .connect(borrower)
-    .payouts(loanId, repaymentAmount);
+  // // Call payouts
+  // const payoutTx = await lendingPool
+  //   .connect(borrower)
+  //   .payouts(loanId, repaymentAmount);
 
-  await payoutTx.wait();
+  // await payoutTx.wait();
 
-  console.log(
-    `Borrower repaid ${formatUnits(repaymentAmount, 6)} USDC for loan ${loanId}`,
-  );
+  // console.log(
+  //   `Borrower repaid ${formatUnits(repaymentAmount, 6)} USDC for loan ${loanId}`,
+  // );
 
-  const stakedAfter = await lendingPool.getStakedAmount(loanId);
-  console.log(
-    `Staked amount after repayment: ${ethers.formatUnits(stakedAfter, 8)} cbBTC`,
-  );
+  // const stakedAfter = await lendingPool.getStakedAmount(loanId);
+  // console.log(
+  //   `Staked amount after repayment: ${ethers.formatUnits(stakedAfter, 8)} cbBTC`,
+  // );
 
-  // Check balances after payout
-  const lender1Post = await usdc.balanceOf(lender1.address);
-  const lender2Post = await usdc.balanceOf(lender2.address);
-  const borrowerPost = await usdc.balanceOf(borrower.address);
-  const borrowerBtcPost = await cbBtc.balanceOf(borrower.address);
-  const lendingPoolPost = await cbBtc.balanceOf(lendingPoolAddress);
+  // // Check balances after payout
+  // const lender1Post = await usdc.balanceOf(lender1.address);
+  // const lender2Post = await usdc.balanceOf(lender2.address);
+  // const borrowerPost = await usdc.balanceOf(borrower.address);
+  // const borrowerBtcPost = await cbBtc.balanceOf(borrower.address);
+  // const lendingPoolPost = await cbBtc.balanceOf(lendingPoolAddress);
 
-  console.log("Balances after repayment:");
-  console.log(`Lender1: ${formatUnits(lender1Post, 6)} USDC`);
-  console.log(`Lender2: ${formatUnits(lender2Post, 6)} USDC`);
-  console.log(`Borrower: ${formatUnits(borrowerPost, 6)} USDC`);
-  console.log(`Borrower cbBTC: ${formatUnits(borrowerBtcPost, 8)} cbBTC`);
-  console.log(`LendingPool cbBTC: ${formatUnits(lendingPoolPost, 8)} cbBTC`);
+  // console.log("Balances after repayment:");
+  // console.log(`Lender1: ${formatUnits(lender1Post, 6)} USDC`);
+  // console.log(`Lender2: ${formatUnits(lender2Post, 6)} USDC`);
+  // console.log(`Borrower: ${formatUnits(borrowerPost, 6)} USDC`);
+  // console.log(`Borrower cbBTC: ${formatUnits(borrowerBtcPost, 8)} cbBTC`);
+  // console.log(`LendingPool cbBTC: ${formatUnits(lendingPoolPost, 8)} cbBTC`);
 
-  // Check cbBTC still staked
-  const remainingStake = await aavePool.getUserSupply(
-    addresses[1],
-    lendingPoolAddress,
-  );
-  console.log(
-    `Remaining cbBTC in Aave for LendingPool: ${formatUnits(remainingStake, 8)} cbBTC`,
-  );
+  // // Check cbBTC still staked
+  // const remainingStake = await aavePool.getUserSupply(
+  //   addresses[1],
+  //   lendingPoolAddress,
+  // );
+  // console.log(
+  //   `Remaining cbBTC in Aave for LendingPool: ${formatUnits(remainingStake, 8)} cbBTC`,
+  // );
 }
 
 main()

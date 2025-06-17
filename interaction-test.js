@@ -1,4 +1,5 @@
-const { ethers } = require("hardhat");
+import pkg from 'hardhat';
+const { ethers } = pkg;
 
 async function interactor(mockDeployerAddress, lendingPoolAddress) {
   console.log("Starting test interactions script...");
@@ -86,8 +87,8 @@ async function interactor(mockDeployerAddress, lendingPoolAddress) {
   console.log("Creating loan...");
   const loanTx = await lendingPool.connect(borrower).loan(
     loanAmount, // Total loan amount
-    12, // 12 months duration
-    10, // 10% annual interest rate
+    18, // 18 months duration
+    15, // 15% annual interest rate
     [lender1.address, lender2.address], // Lenders
     [lender1Amount, lender2Amount], // Lender contributions
   );
@@ -142,6 +143,10 @@ async function interactor(mockDeployerAddress, lendingPoolAddress) {
   console.log("\nTest interaction complete! 🎉");
 }
 
-module.exports = {
-  interactor,
-};
+await interactor(
+  "0x45dF8BF8Ed77Fe7c7549f85edc6ca085beF82D51", "0x8634d56D28dA9925ECd16FE4c22f044E5e3eB59c"
+)
+
+// module.exports = {
+//   interactor,
+// };

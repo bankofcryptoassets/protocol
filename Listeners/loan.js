@@ -229,60 +229,63 @@ const processInstallmentPaidEvent = async (event) => {
 const updateAllowancesAfterLoan = async (loanId, contributions) => {
   try {
     const loan = await Loan.findOne({ loan_id: loanId });
+    if (!loan) {
+      console.error(`Loan ${loanId} not found`);
+      return;
+    }
+
+    if (loan.allowances_updated) {
+      console.log(`Allowances for loan ${loanId} already updated. Skipping.`);
+      return;
+    }
+
     console.log(
       `Updating allowances for loan ${loanId} with ${contributions.length} lenders`,
     );
 
-    // Update each lender's available allowance
     for (const contribution of contributions) {
       const lenderAddress = contribution.lender;
       const contributionAmount = contribution.amount;
 
-      // Find the lender's allowance
-      const allowance = await Lend.findOne({
-        user_address: lenderAddress,
-      });
+      const allowance = await Lend.findOne({ user_address: lenderAddress });
 
-      console.log(
-        `Allowance for lender ${lenderAddress}: ${JSON.stringify(allowance)}`,
-      );
+      if (!allowance) {
+        console.error(`No allowance record found for ${lenderAddress}`);
+        continue;
+      }
 
-      console.log(
-        `Updating allowance for lender ${lenderAddress}, contribution: ${contributionAmount}`,
-      );
-
-      // Calculate new available amount
       const currentAvailable = Number(allowance.available_amount);
-      const contributionAmountBigInt = Number(contributionAmount);
 
-      if (currentAvailable < contributionAmountBigInt) {
+      if (currentAvailable < contributionAmount) {
         console.error(
-          `Lender ${lenderAddress} has insufficient allowance: available=${currentAvailable}, required=${contributionAmountBigInt}`,
+          `Lender ${lenderAddress} has insufficient allowance: available=${currentAvailable}, required=${contributionAmount}`,
         );
         continue;
       }
 
-      const newAvailable = currentAvailable - contributionAmountBigInt;
-
-      // Update allowance
-      allowance.available_amount = Number(newAvailable);
-      allowance.loans.push(loan._id);
-      allowance.updated_at = new Date();
+      allowance.available_amount = currentAvailable - contributionAmount;
       allowance.utilisedAmount =
-        Number(allowance.utilisedAmount) + Number(contributionAmount);
+        Number(allowance.utilisedAmount) + contributionAmount;
+      allowance.updated_at = new Date();
+      allowance.loans.push(loan._id);
 
       await allowance.save();
 
       console.log(
-        `Updated allowance for lender ${lenderAddress}, new available: ${newAvailable}, utilised: ${allowance.utilisedAmount}`,
+        `Updated allowance for lender ${lenderAddress}, new available: ${allowance.available_amount}, utilised: ${allowance.utilisedAmount}`,
       );
     }
+
+    // ✅ Mark as updated
+    loan.allowances_updated = true;
+    await loan.save();
 
     console.log(`Finished updating allowances for loan ${loanId}`);
   } catch (error) {
     console.error("Error updating allowances after loan:", error);
   }
 };
+
 
 module.exports = {
   recordLoanEvents,
