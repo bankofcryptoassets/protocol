@@ -88,9 +88,9 @@ const getLoanById = async (req, res) => {
   try {
     let loan;
     const { id } = req.params;
-    loan = await Loan.findById(id);
+    loan = await Loan.findOne({ loan_id: id });
     if (!loan) {
-      loan = await Loan.findOne({ loan_id: id });
+      loan = await Loan.findById(id);
     }
     return res.json({ loan });
   } catch (error) {
