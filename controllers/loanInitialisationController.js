@@ -8,33 +8,34 @@ const ethers = require("ethers");
 exports.LoanSummary = async (req, res) => {
   try {
     const btcAmount = parseFloat(req.body.amount); // Amount in BTC
-    // const downPayemntAmount = parseFloat(req.body.downPaymentAmount); // Amount in USD for down payment
     const amountInUSD = await getBTCRate(btcAmount); // USD equivalent
     const term = parseInt(req.body.term);
     const interestRate = parseFloat(req.body.interestRate);
     const btcPrice = amountInUSD / btcAmount;
 
-    const totalLoanAmount = parseFloat(amountInUSD.toFixed(6));
+    const downPaymentAmount = parseFloat(req.body.downPaymentAmount) || (0.2 * amountInUSD); // Amount in USD for down payment
+
+    const totalLoanAmount = parseFloat(amountInUSD);
     const totalLoanAmountRaw = ethers.parseUnits(totalLoanAmount.toString(), 6);
-    // const downPaymentAmountRaw = ethers.parseUnits(downPayemntAmount.toString(), 6);
+    const downPaymentAmountRaw = ethers.parseUnits(downPaymentAmount.toFixed(6).toString(), 6);
 
-    // const [basisPoints, validPayment] = await contract.getDownPaymentBasisPoints(totalLoanAmountRaw, downPaymentAmountRaw);
+    const [basisPoints, validPayment] = await contract.getDownPaymentBasisPoints(totalLoanAmountRaw, downPaymentAmountRaw);
 
-    // console.log("Basis Points:", basisPoints.toString());
-    // console.log("Valid Payment:", validPayment);
+    console.log("Basis Points:", basisPoints.toString());
+    console.log("Valid Payment:", validPayment);
 
     // ✅ Call the contract for exact borrower deposit and lender principal
-    const [borrowerDepositRaw, lenderPrincipalRaw] = await contract.computeLoanParts(totalLoanAmountRaw);
+    const [borrowerDepositRaw, lenderPrincipalRaw, isValid] = await contract.getLoanRequirements(totalLoanAmountRaw, basisPoints);
 
-    // console.log("Borrower Deposit Raw:", borrowerDepositRaw.toString());
-    // console.log("Lender Principal Raw:", lenderPrincipalRaw.toString());
-    // console.log("Total Loan Amount Raw:", totalLoanAmountRaw.toString());
+    console.log("Borrower Deposit Raw:", borrowerDepositRaw.toString());
+    console.log("Lender Principal Raw:", lenderPrincipalRaw.toString());
+    console.log("Total Loan Amount Raw:", totalLoanAmountRaw.toString());
 
     const downPayment = parseFloat(ethers.formatUnits(borrowerDepositRaw, 6));
     const principal = parseFloat(ethers.formatUnits(lenderPrincipalRaw, 6));
 
-    // console.log("Down Payment:", downPayment);
-    // console.log("Principal:", principal);
+    console.log("Down Payment:", downPayment);
+    console.log("Principal:", principal);
 
     const openingFee = principal * 0.01;
     const upfrontPayment = downPayment + openingFee;
@@ -84,10 +85,10 @@ exports.LoanSummary = async (req, res) => {
     const apr = calculateAPR(monthlyPayment, term, principal);
 
     const loanSummary = {
-      // basisPoints: basisPoints.toString(),
+      basisPoints: basisPoints.toString(),
       loanAmount: totalLoanAmount.toFixed(2),
       openingFee: openingFee.toFixed(2),
-      upfrontPayment: upfrontPayment.toFixed(2),
+      upfrontPayment: upfrontPayment.toFixed(6).toString(),
       downPayment : downPayment.toString(),
       principal : principal.toString(),
       monthlyPayment: monthlyPayment.toFixed(2),
