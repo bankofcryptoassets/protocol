@@ -1,5 +1,6 @@
 const Lend = require("../schema/LendingSchema");
 const User = require("../schema/UserSchema");
+const { globalUSDInvested, uniqueLenders } = require("../utils/helperStats");
 
 // const createLending = async (req, res) => {
 //   console.log("Creating Lending");
@@ -109,8 +110,23 @@ const createAllowance = async (req, res) => {
   }
 };
 
+const stats = async() => {
+    const totalUSDInvested = await globalUSDInvested();
+    const totallenders = await uniqueLenders();
+    const baseAPR = 0.05;
+    const loanAPR = 0.07;
+
+    return {
+      totalUSDInvested,
+      totallenders,
+      baseAPR,
+      loanAPR,
+    };
+}
+
 module.exports = {
   getLendings,
   getLendingById,
   createAllowance,
+  stats,
 };

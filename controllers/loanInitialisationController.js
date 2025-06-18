@@ -156,10 +156,7 @@ exports.LoanAvailability = async (req, res) => {
     const btcBorrowers = await uniqueByUserId();
     const totalLoanInBTC = await totalLoanedInBTC();
     const totalLoanInUSD = await totalLoanedinUSD();
-    const totalUSDInvested = await globalUSDInvested();
-    const totallenders = await uniqueLenders();
-  console.log("Total Lenders:", totallenders);
-  console.log("Total USD Invested:", totalUSDInvested);
+
   console.log("Total Loaned in BTC:", totalLoanInBTC);
   console.log("Total Loaned in USD:", totalLoanInUSD);
   console.log("Total Borrowers:", btcBorrowers);
