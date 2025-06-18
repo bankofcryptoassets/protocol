@@ -8,7 +8,7 @@ const ethers = require("ethers");
 exports.LoanSummary = async (req, res) => {
   try {
     const btcAmount = parseFloat(req.body.amount); // Amount in BTC
-    const downPayemntAmount = parseFloat(req.body.downPaymentAmount); // Amount in USD for down payment
+    // const downPayemntAmount = parseFloat(req.body.downPaymentAmount); // Amount in USD for down payment
     const amountInUSD = await getBTCRate(btcAmount); // USD equivalent
     const term = parseInt(req.body.term);
     const interestRate = parseFloat(req.body.interestRate);
@@ -16,25 +16,25 @@ exports.LoanSummary = async (req, res) => {
 
     const totalLoanAmount = parseFloat(amountInUSD.toFixed(6));
     const totalLoanAmountRaw = ethers.parseUnits(totalLoanAmount.toString(), 6);
-    const downPaymentAmountRaw = ethers.parseUnits(downPayemntAmount.toString(), 6);
+    // const downPaymentAmountRaw = ethers.parseUnits(downPayemntAmount.toString(), 6);
 
-    const [basisPoints, validPayment] = await contract.getDownPaymentBasisPoints(totalLoanAmountRaw, downPaymentAmountRaw);
+    // const [basisPoints, validPayment] = await contract.getDownPaymentBasisPoints(totalLoanAmountRaw, downPaymentAmountRaw);
 
-    console.log("Basis Points:", basisPoints.toString());
-    console.log("Valid Payment:", validPayment);
+    // console.log("Basis Points:", basisPoints.toString());
+    // console.log("Valid Payment:", validPayment);
 
     // ✅ Call the contract for exact borrower deposit and lender principal
-    const [borrowerDepositRaw, lenderPrincipalRaw, isvalidPayment] = await contract.computeLoanParts(totalLoanAmountRaw, basisPoints);
+    const [borrowerDepositRaw, lenderPrincipalRaw] = await contract.computeLoanParts(totalLoanAmountRaw);
 
-    console.log("Borrower Deposit Raw:", borrowerDepositRaw.toString());
-    console.log("Lender Principal Raw:", lenderPrincipalRaw.toString());
-    console.log("Total Loan Amount Raw:", totalLoanAmountRaw.toString());
+    // console.log("Borrower Deposit Raw:", borrowerDepositRaw.toString());
+    // console.log("Lender Principal Raw:", lenderPrincipalRaw.toString());
+    // console.log("Total Loan Amount Raw:", totalLoanAmountRaw.toString());
 
     const downPayment = parseFloat(ethers.formatUnits(borrowerDepositRaw, 6));
     const principal = parseFloat(ethers.formatUnits(lenderPrincipalRaw, 6));
 
-    console.log("Down Payment:", downPayment);
-    console.log("Principal:", principal);
+    // console.log("Down Payment:", downPayment);
+    // console.log("Principal:", principal);
 
     const openingFee = principal * 0.01;
     const upfrontPayment = downPayment + openingFee;
@@ -84,7 +84,7 @@ exports.LoanSummary = async (req, res) => {
     const apr = calculateAPR(monthlyPayment, term, principal);
 
     const loanSummary = {
-      basisPoints: basisPoints.toString(),
+      // basisPoints: basisPoints.toString(),
       loanAmount: totalLoanAmount.toFixed(2),
       openingFee: openingFee.toFixed(2),
       upfrontPayment: upfrontPayment.toFixed(2),
@@ -169,8 +169,6 @@ exports.LoanAvailability = async (req, res) => {
       btcBorrowers,
       totalLoanInBTC,
       totalLoanInUSD,
-      totalUSDInvested,
-      totallenders,
     },
   });
 };
@@ -215,4 +213,30 @@ function calculateAPR(monthlyPayment, loanTerm, netLoanAmount) {
   }
 
   return guess * 12 * 100; // Annualize and convert to percentage
+}
+
+exports.getBasisPoints = async(req,res) => {
+  try {
+    const { totalLoanAmount, downPaymentAmount } = req.query;
+
+    if (!totalLoanAmount || !downPaymentAmount) {
+      return res.status(400).json({ error: "Missing required parameters" });
+    }
+
+    const totalLoanAmountRaw = ethers.parseUnits(totalLoanAmount.toString(), 6);
+    const downPaymentAmountRaw = ethers.parseUnits(downPaymentAmount.toString(), 6);
+
+    const [basisPoints, validPayment] = await contract.getDownPaymentBasisPoints(totalLoanAmountRaw, downPaymentAmountRaw);
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        basisPoints: basisPoints.toString(),
+        validPayment: validPayment,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching basis points:", error);
+    res.status(500).json({ status: "error", message: error.message });
+  }
 }
