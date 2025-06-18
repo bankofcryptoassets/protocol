@@ -1,5 +1,5 @@
 const ethers = require("ethers");
-const { abi } = require("./artifacts/contracts/Lending.sol/LendingPool.json");
+const { abi } = require("./artifacts/Contracts/Lending.sol/LendingPool.json");
 require("dotenv").config();
 
 const provider = new ethers.JsonRpcProvider(

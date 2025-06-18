@@ -1,6 +1,6 @@
 const { ethers } = require("hardhat");
 const { USDC_Address } = require("../constants");
-const mockUSDC = require("../artifacts/contracts/Helper.sol/MockUSDC.json");
+const mockUSDC = require("../artifacts/Contracts/Helper.sol/MockUSDC.json");
 const { provider, wallet } = require("../constants");
 
 const MIN_USDC_TO_SEND = ethers.parseUnits("10000", 6); // send 100 USDC (6 decimals)
