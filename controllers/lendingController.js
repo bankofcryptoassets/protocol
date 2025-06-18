@@ -110,18 +110,18 @@ const createAllowance = async (req, res) => {
   }
 };
 
-const stats = async() => {
+const stats = async(req, res) => {
     const totalUSDInvested = await globalUSDInvested();
     const totallenders = await uniqueLenders();
     const baseAPR = 0.05;
     const loanAPR = 0.07;
 
-    return {
-      totalUSDInvested,
-      totallenders,
-      baseAPR,
-      loanAPR,
-    };
+    res.status(200).json({
+        totalUSDInvested,
+        totallenders,
+        baseAPR,
+        loanAPR,
+    });
 }
 
 module.exports = {
