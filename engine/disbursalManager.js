@@ -2,6 +2,8 @@ const mongoose = require("mongoose");
 const Loan = require("../schema/LoaningSchema"); // Adjust the path as necessary
 const User = require("../schema/UserSchema"); // Adjust the path as necessary
 const ethers = require("ethers");
+const Insurance = require("../schema/InsuranceSchema");
+const insuranceService = require("../services/insuranceService");
 
 async function processPayment(loanId, paymentAmount) {
   const loan = await Loan.findById(loanId).populate("lends");
@@ -72,6 +74,12 @@ async function processPayment(loanId, paymentAmount) {
 
   // Save the loan with the updated fields
   await loan.save();
+
+  // Step 9: rollover insurance if needed
+  const insurance = await Insurance.findOne({ loan_id: loanId });
+  if (insurance) {
+    await insuranceService.rolloverInsurance(insurance._id);
+  }
   console.log("Loan payment processed successfully.");
 }
 

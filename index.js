@@ -10,12 +10,15 @@ const loanRouter = require("./routes/loanRouter");
 const paymentRouter = require("./routes/paymentRouter");
 const lendingRouter = require("./routes/lendRouter");
 const loanInitialisationRouter = require("./routes/initialisationRouter");
+const insuranceRouter = require("./routes/insuranceRouter");
 
 const { seralizeUser } = require("./controllers/authController");
 const { recordDeposit } = require("./Listeners/deposit");
 const { recordLoanEvents } = require("./Listeners/loan");
 const { recordPayoutEvents } = require("./Listeners/payment");
 const { runAutoPayout } = require("./engine/autoPayCron");
+
+require("dotenv").config();
 
 const app = express();
 connectDB();
@@ -58,11 +61,13 @@ app.use("/api/loan", loanRouter);
 app.use("/api/payment", paymentRouter);
 app.use("/api/lending", lendingRouter);
 app.use("/api/initialisation", loanInitialisationRouter);
+app.use("/api/insurance", insuranceRouter);
 
 app.get("/", async (req, res) => {
   return res.json({ message: "Hello World" });
 });
 
-app.listen(5001, () => {
-  console.log("Server started on port 5001");
+const port = process.env.PORT || 5005;
+app.listen(port, () => {
+  console.log(`Server started on port ${port}`);
 });
