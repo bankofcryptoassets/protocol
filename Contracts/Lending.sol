@@ -125,7 +125,7 @@ event DebugUnstakeProportion(
     ) external {
         require(totalAmount > 0, "Invalid amount");
         require(durationMonths > 0, "Invalid duration");
-        require(!hasActiveLoan[msg.sender], "Borrower already has an active loan");
+        // require(!hasActiveLoan[msg.sender], "Borrower already has an active loan");
         require(lenderAddresses.length == lenderAmounts.length, "Lender addresses and amounts length mismatch");
         require(lenderAddresses.length > 0, "No lenders provided");
 
@@ -659,6 +659,20 @@ function getContributions(bytes32 loanId) external view returns (
         require(loan.isActive, "Loan is not active");
         loan.insuranceTaken = status;
     }
+
+
+    /**
+ * Given a total loan amount, returns the exact required:
+ * - Borrower deposit (20%)
+ * - Lender principal (80%)
+ */
+function computeLoanParts(uint256 totalAmount) public pure returns (
+    uint256 borrowerDeposit,
+    uint256 lenderPrincipal
+) {
+    borrowerDeposit = (totalAmount * 20) / 100;
+    lenderPrincipal = totalAmount - borrowerDeposit;
+}
 
 
 }

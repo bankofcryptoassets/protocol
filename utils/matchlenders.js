@@ -16,7 +16,7 @@ function matchLendersForLoan(
   durationMonths,
 ) {
   // Convert loan amount to BigNumber and round to 2 decimal places
-  const loanAmountBN = toBN(loanAmount).toFixed(2);
+  const loanAmountBN = toBN(loanAmount);
   let remainingAmount = toBN(loanAmountBN);
 
   const matchedLenders = [];
@@ -27,7 +27,7 @@ function matchLendersForLoan(
     // Skip if we've already fully funded the loan
     if (remainingAmount.lte(0)) break;
 
-    const availableAmountBN = toBN(allowance.available_amount).toFixed(2);
+    const availableAmountBN = toBN(allowance.available_amount);
     const available = toBN(availableAmountBN);
 
     // Skip lenders with no available funds
@@ -43,21 +43,21 @@ function matchLendersForLoan(
       let contributionAmount = BigNumber.min(available, remainingAmount);
 
       // Ensure we round to 2 decimal places
-      contributionAmount = toBN(contributionAmount.toFixed(2));
+      contributionAmount = toBN(contributionAmount);
 
       matchedLenders.push({
         lender_address: allowance.user_address,
         lender_id: allowance.user_id,
-        amount: contributionAmount.toFixed(2),
+        amount: contributionAmount,
       });
 
       remainingAmount = remainingAmount.minus(contributionAmount);
       // Ensure we don't have floating point errors in remainingAmount
-      remainingAmount = toBN(remainingAmount.toFixed(2));
+      remainingAmount = toBN(remainingAmount);
 
       totalMatched = totalMatched.plus(contributionAmount);
       // Ensure we don't have floating point errors in totalMatched
-      totalMatched = toBN(totalMatched.toFixed(2));
+      totalMatched = toBN(totalMatched);
     }
   }
 
@@ -73,7 +73,7 @@ function matchLendersForLoan(
       // Skip if we've already fully funded the loan
       if (remainingAmount.lte(0)) break;
 
-      const availableAmountBN = toBN(allowance.available_amount).toFixed(2);
+      const availableAmountBN = toBN(allowance.available_amount);
       const available = toBN(availableAmountBN);
 
       // Skip lenders with no available funds
@@ -83,21 +83,21 @@ function matchLendersForLoan(
       let contributionAmount = BigNumber.min(available, remainingAmount);
 
       // Ensure we round to 2 decimal places
-      contributionAmount = toBN(contributionAmount.toFixed(2));
+      contributionAmount = toBN(contributionAmount);
 
       matchedLenders.push({
         lender_address: allowance.user_address,
         lender_id: allowance.user_id,
-        amount: contributionAmount.toFixed(2),
+        amount: contributionAmount,
       });
 
       remainingAmount = remainingAmount.minus(contributionAmount);
       // Ensure we don't have floating point errors in remainingAmount
-      remainingAmount = toBN(remainingAmount.toFixed(2));
+      remainingAmount = toBN(remainingAmount);
 
       totalMatched = totalMatched.plus(contributionAmount);
       // Ensure we don't have floating point errors in totalMatched
-      totalMatched = toBN(totalMatched.toFixed(2));
+      totalMatched = toBN(totalMatched);
     }
   }
 
@@ -108,19 +108,19 @@ function matchLendersForLoan(
     const currentAmount = toBN(firstLender.amount);
     const newAmount = currentAmount.plus(remainingAmount);
 
-    firstLender.amount = newAmount.toFixed(2);
+    firstLender.amount = newAmount;
     remainingAmount = new BigNumber(0);
 
     // Update totalMatched
     totalMatched = toBN(loanAmountBN);
   }
 
-  console.log("Total matched amount:", totalMatched.toFixed(2));
+  console.log("Total matched amount:", totalMatched);
 
   return {
     success: remainingAmount.lte(0),
     lenders: matchedLenders,
-    totalMatched: totalMatched.toFixed(2),
+    totalMatched: totalMatched,
   };
 }
 

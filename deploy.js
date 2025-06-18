@@ -72,13 +72,16 @@ async function main() {
     `Added ${formatUnits(usdcToAdd, 6)} USDC and ${formatUnits(btcToAdd, 8)} cbBTC to the swap router`,
   );
 
+  const oracleAddress = ethers.getAddress("0x0FB99723Aee6f420beAD13e6bBB79b7E6F034298");
+
+
   // Deploy the LendingPool contract
   console.log("Deploying LendingPool contract...");
   const LendingPool = await ethers.getContractFactory("LendingPool");
   const lendingPool = await LendingPool.deploy(
     addresses[0], // USDC
     addresses[1], // cbBTC
-    "0x0FB99723Aee6f420beAD13e6bBB79b7E6F034298", // Oracle
+    oracleAddress, // Oracle
     addresses[2], // Aave Pool
     addresses[3], // Swap Router
   );
