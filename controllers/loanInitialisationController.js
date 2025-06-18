@@ -1,11 +1,14 @@
 const Lend = require("../schema/LendingSchema");
-const { contract } = require("../constants");
+const { contract, usdc } = require("../constants");
 const { getUSDRate, getBTCRate } = require("../utils/getPrice");
+const { fetchFearGreedIndex } = require("../utils/FGI");
+const { uniqueByUserId, totalLoanedInBTC, totalLoanedinUSD, globalUSDInvested, uniqueLenders } = require("../utils/helperStats");
 const ethers = require("ethers");
 
 exports.LoanSummary = async (req, res) => {
   try {
     const btcAmount = parseFloat(req.body.amount); // Amount in BTC
+    const downPayemntAmount = parseFloat(req.body.downPaymentAmount); // Amount in USD for down payment
     const amountInUSD = await getBTCRate(btcAmount); // USD equivalent
     const term = parseInt(req.body.term);
     const interestRate = parseFloat(req.body.interestRate);
@@ -13,9 +16,15 @@ exports.LoanSummary = async (req, res) => {
 
     const totalLoanAmount = parseFloat(amountInUSD.toFixed(6));
     const totalLoanAmountRaw = ethers.parseUnits(totalLoanAmount.toString(), 6);
+    const downPaymentAmountRaw = ethers.parseUnits(downPayemntAmount.toString(), 6);
+
+    const [basisPoints, validPayment] = await contract.getDownPaymentBasisPoints(totalLoanAmountRaw, downPaymentAmountRaw);
+
+    console.log("Basis Points:", basisPoints.toString());
+    console.log("Valid Payment:", validPayment);
 
     // ✅ Call the contract for exact borrower deposit and lender principal
-    const [borrowerDepositRaw, lenderPrincipalRaw] = await contract.computeLoanParts(totalLoanAmountRaw);
+    const [borrowerDepositRaw, lenderPrincipalRaw, isvalidPayment] = await contract.computeLoanParts(totalLoanAmountRaw, basisPoints);
 
     console.log("Borrower Deposit Raw:", borrowerDepositRaw.toString());
     console.log("Lender Principal Raw:", lenderPrincipalRaw.toString());
@@ -75,6 +84,7 @@ exports.LoanSummary = async (req, res) => {
     const apr = calculateAPR(monthlyPayment, term, principal);
 
     const loanSummary = {
+      basisPoints: basisPoints.toString(),
       loanAmount: totalLoanAmount.toFixed(2),
       openingFee: openingFee.toFixed(2),
       upfrontPayment: upfrontPayment.toFixed(2),
@@ -122,16 +132,11 @@ exports.LoanAvailability = async (req, res) => {
   // Check the amount of USD available in contract -> Use a price feed to convert USD to BTC -> Return the amount of BTC available for loan
   let availableLoanAmountInBTC;
   try {
-    const allowances = await Lend.find();
-
-    console.log("Allowances:", allowances);
-
-    const contractBalance = allowances.reduce((acc, allowance) => {
-      return acc + Number.parseFloat(allowance.available_amount);
-    }, 0);
+    const contractBalanceRaw = await usdc.balanceOf(await contract.getAddress());
+    const contractBalance = ethers.formatUnits(contractBalanceRaw, 6);
     console.log("Contract Balance:", contractBalance);
     // const parsedContractBalance = parseFloat(ethers.formatUnits(contractBalance, 6));
-    const btcAmount = await getUSDRate(contractBalance);
+    const btcAmount = await getUSDRate(Number(contractBalance));
 
     const availableLoanAmount = Number.parseFloat(btcAmount);
     availableLoanAmountInBTC = availableLoanAmount;
@@ -144,10 +149,31 @@ exports.LoanAvailability = async (req, res) => {
     availableLoanAmountInBTC = 1;
   }
 
+
+    const fgi = await fetchFearGreedIndex();
+    console.log("Fear & Greed Index:", fgi);
+
+    const btcBorrowers = await uniqueByUserId();
+    const totalLoanInBTC = await totalLoanedInBTC();
+    const totalLoanInUSD = await totalLoanedinUSD();
+    const totalUSDInvested = await globalUSDInvested();
+    const totallenders = await uniqueLenders();
+  console.log("Total Lenders:", totallenders);
+  console.log("Total USD Invested:", totalUSDInvested);
+  console.log("Total Loaned in BTC:", totalLoanInBTC);
+  console.log("Total Loaned in USD:", totalLoanInUSD);
+  console.log("Total Borrowers:", btcBorrowers);
+
   res.status(200).json({
     status: "success",
     data: {
       availableLoanAmountInBTC,
+      fgi,
+      btcBorrowers,
+      totalLoanInBTC,
+      totalLoanInUSD,
+      totalUSDInvested,
+      totallenders,
     },
   });
 };

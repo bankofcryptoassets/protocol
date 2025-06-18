@@ -1,6 +1,7 @@
 const { contract, provider } = require("../constants");
 const Lend = require("../schema/LendingSchema"); // Import the Lend model
 const User = require("../schema/UserSchema"); // Import the User model
+const ethers = require("ethers");
 
 /**
  * Listens for Deposit events and records them to the database
@@ -24,9 +25,10 @@ const recordDeposit = async () => {
     // Process each deposit event
     for (const event of depositEvents) {
       // Extract data from the event based on your contract
-      // event Deposit(address indexed lender, uint256 amount);
+      // event Deposit(address indexed lender, uint256 amount, bool reinvest);
       const lender = event.args.lender;
-      const amount = event.args.amount;
+      const amount = ethers.formatUnits(event.args.amount, 6); // 6 decimals for USDC
+      const reinvest = event.args.reinvest
 
       console.log(
         `Processing deposit from ${lender} of amount ${amount.toString()}`,
@@ -59,6 +61,7 @@ const recordDeposit = async () => {
         openedOn: new Date(timestamp * 1000),
         transaction_hash: event.transactionHash,
         chain_id,
+        reinvest
       });
 
       await lending.save();

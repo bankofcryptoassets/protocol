@@ -20,7 +20,7 @@ contract MockAavePool {
     event Withdraw(address indexed asset, address indexed user, uint256 amount);
     event InterestRateSet(address indexed asset, uint256 rate);
 
-    constructor() {
+    constructor() public{
         owner = msg.sender;
     }
 
@@ -68,12 +68,12 @@ contract MockAavePool {
      */
     function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
         // Check if user has enough balance
-        uint256 currentBalance = userSupplies[msg.sender][asset];
+        uint256 currentBalance = userSupplies[asset][msg.sender];
         require(currentBalance >= amount, "Insufficient balance for withdrawal");
         
         // Update storage first to prevent reentrancy
-        userSupplies[msg.sender][asset] = currentBalance - amount;
-        
+        userSupplies[asset][msg.sender] = currentBalance - amount;
+
         // Transfer the asset to the specified address
         bool success = IERC20(asset).transfer(to, amount);
         require(success, "Transfer failed");
@@ -118,7 +118,7 @@ contract MockSwapRouter {
     event RateSet(address indexed tokenA, address indexed tokenB, uint256 numerator, uint256 denominator);
     event Swap(address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);
 
-    constructor() {
+    constructor() public {
         owner = msg.sender;
     }
 
@@ -211,7 +211,7 @@ function swapExactTokensForTokens(
 contract MockUSDC is ERC20, Ownable {
     uint8 private _decimals = 6; // USDC has 6 decimals
 
-    constructor() ERC20("Mock USDC", "USDC") Ownable(msg.sender) {}
+    constructor() public ERC20("Mock USDC", "USDC") Ownable(msg.sender) {}
 
     /**
      * @dev Returns the number of decimals used for token
@@ -246,7 +246,7 @@ contract MockUSDC is ERC20, Ownable {
 contract MockCbBTC is ERC20, Ownable {
     uint8 private _decimals = 8; // BTC has 8 decimals
 
-    constructor() ERC20("Mock Coinbase BTC", "cbBTC") Ownable(msg.sender) {}
+    constructor() public ERC20("Mock Coinbase BTC", "cbBTC") Ownable(msg.sender) {}
 
     /**
      * @dev Returns the number of decimals used for token
@@ -288,7 +288,7 @@ contract MockBTCPriceOracle {
     
     event PriceUpdated(int256 price);
 
-    constructor(int256 initialPrice) {
+    constructor(int256 initialPrice) public {
         price = initialPrice;
         owner = msg.sender;
     }

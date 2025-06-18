@@ -17,6 +17,7 @@ const LendingSchema = new mongoose.Schema({
   updated_at: { type: Date, default: Date.now },
   // Related loans (can be populated as loans are created)
   loans: [{ type: mongoose.Types.ObjectId, ref: "Loan" }],
+  reinvest : { type: Boolean, default: false },
 });
 
 const Lend = mongoose.model("Lend", LendingSchema);
