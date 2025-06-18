@@ -88,6 +88,22 @@ const getLoanById = async (req, res) => {
   try {
     let loan;
     const { id } = req.params;
+
+    loan = await Loan.findOne({ loan_id: id });
+    if (!loan) {
+    loan = await Loan.findById(id);
+    }
+    return res.json({ loan });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+const getLoanByAddress = async (req, res) => {
+  try {
+    const { address } = req.params;
+    const loan = await Loan.find({ user_address: address });
+    loan = await Loan.findById(id);
     loan = await Loan.findOne({ loan_id: id });
     if (!loan) {
       loan = await Loan.findById(id);
@@ -183,4 +199,5 @@ module.exports = {
   getLoanById,
   initialDetails,
   matchLenders,
+  getLoanByAddress,
 };

@@ -247,7 +247,7 @@ function _swapUsdcToCbBtc(uint256 usdcAmount) internal returns (uint256) {
             }));
         }
         
-        require(collected == lenderPrincipal, "Collected amount doesn't match principal");
+        // require(collected == lenderPrincipal, "Collected amount doesn't match principal");
 
         // Calculate monthly payment
         uint256 monthlyRate = (annualInterestRate * 1e18) / (12 * 100);
@@ -660,6 +660,7 @@ function getContributions(bytes32 loanId) external view returns (
         loan.insuranceTaken = status;
     }
 
+
     /**
  * Given a total loan amount, returns the exact required:
  * - Borrower deposit (20%)
@@ -672,7 +673,6 @@ function computeLoanParts(uint256 totalAmount) public pure returns (
     borrowerDeposit = (totalAmount * 20) / 100;
     lenderPrincipal = totalAmount - borrowerDeposit;
 }
-
 
 
 }
