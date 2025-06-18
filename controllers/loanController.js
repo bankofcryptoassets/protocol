@@ -104,8 +104,9 @@ const getLoanByAddress = async (req, res) => {
     const { address } = req.params;
     const loan = await Loan.find({ user_address: address });
     loan = await Loan.findById(id);
+    loan = await Loan.findOne({ loan_id: id });
     if (!loan) {
-      loan = await Loan.findOne({ loan_id: id });
+      loan = await Loan.findById(id);
     }
     return res.json({ loan });
   } catch (error) {

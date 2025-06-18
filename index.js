@@ -43,8 +43,8 @@ app.use(
 // Add a specific handler for OPTIONS requests
 app.options("*", cors());
 
-// schedule cron for every minute
-cron.schedule("* * * * *", async () => {
+// schedule cron for every 5 seconds
+cron.schedule("*/5 * * * * *", async () => {
   // await recordDeposit();
   await recordLoanEvents();
   await recordPayoutEvents();
