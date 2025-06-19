@@ -39,7 +39,7 @@ const { globalUSDInvested, uniqueLenders } = require("../utils/helperStats");
 const getLendings = async (req, res) => {
   try {
     const lendings = await Lend.find({ user_id: req.user._id }).populate(
-      "user_id loans",
+      "user_id",
     );
     return res.json({ lendings });
   } catch (error) {

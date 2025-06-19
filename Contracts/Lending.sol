@@ -148,43 +148,57 @@ contract LendingPool {
         uint256 totalAmount,
         uint256 durationMonths,
         uint256 annualInterestRate,
-        uint256 downPaymentPercentage // New parameter: percentage in basis points (2000 = 20%, 5000 = 50%)
+        uint256 downPaymentPercentage // 2000 = 20%
     ) external {
         require(totalAmount > 0, "Invalid amount");
         require(durationMonths > 0, "Invalid duration");
-        require(
-            downPaymentPercentage >= 2000 && downPaymentPercentage <= 5000,
-            "Down payment must be between 20% and 50%"
-        );
-        require(totalPoolBalance >= totalAmount, "Insufficient pool liquidity");
 
-        // Origination fee
+        // Use shared loan requirements utility
+        (uint256 borrowerDeposit, uint256 lenderPrincipal, bool isValid) = getLoanRequirements(
+            totalAmount,
+            downPaymentPercentage
+        );
+
+        require(isValid, "Down payment must be between 20% and 50%");
+        require(totalPoolBalance >= lenderPrincipal, "Insufficient pool liquidity");
+
+        // Collect origination fee
         uint256 originationFee = (totalAmount * originationFeeBps) / 10000;
         if (originationFee > 0) {
             IERC20(usdcToken).transferFrom(msg.sender, address(this), originationFee);
             accumulatedFees += originationFee;
         }
+
+        // Collect borrower's deposit
+        if (borrowerDeposit > 0) {
+            IERC20(usdcToken).transferFrom(msg.sender, address(this), borrowerDeposit);
+        }
+
+        // Check if we have enough in AAVE to fund the lender portion
         uint256 aaveUSDCSupply = aavePool.getUserSupply(usdcToken, address(this));
-        require(aaveUSDCSupply == totalAmount, "Insufficient AAVE pool balance");
+        require(aaveUSDCSupply >= lenderPrincipal, "Insufficient AAVE pool balance");
 
-        // Withdraw from AAVE pool for the loan
-        uint256 withdrawn = aavePool.withdraw(usdcToken, totalAmount, address(this));
-        require(withdrawn == totalAmount, "Withdraw mismatch");
-        totalPoolBalance -= totalAmount;
+        // Withdraw lender portion
+        uint256 withdrawn = aavePool.withdraw(usdcToken, lenderPrincipal, address(this));
+        require(withdrawn == lenderPrincipal, "Withdraw mismatch");
 
-        // Create loan and collect deposit with dynamic down payment
+        // Update internal balance
+        totalPoolBalance -= lenderPrincipal;
+
+        // Create loan (which should store borrowerDeposit inside it)
         bytes32 loanId = _createLoan(
             totalAmount,
             durationMonths,
             annualInterestRate,
             downPaymentPercentage
         );
+
         Loan storage newLoan = loans[loanId];
 
-        // Swap USDC to cbBTC
-        uint256 cbBtcAmount = _swapUsdcToCbBtc(newLoan.totalAmount);
-        // Stake cbBTC to AAVE
+        // Swap combined USDC amount (borrower + lender) to cbBTC
+        uint256 cbBtcAmount = _swapUsdcToCbBtc(totalAmount);
         _stakeCbBtcToAave(loanId, cbBtcAmount);
+
         emit LoanCreated(loanId, totalAmount, newLoan.borrowerDeposit, msg.sender);
     }
 
@@ -792,7 +806,7 @@ contract LendingPool {
         uint256 totalAmount,
         uint256 downPaymentPercentage
     )
-        external
+        public
         pure
         returns (uint256 borrowerDeposit, uint256 lenderPrincipal, bool isValidDownPayment)
     {

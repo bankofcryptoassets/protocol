@@ -37,6 +37,7 @@ const processLoanCreatedEvent = async (event) => {
     console.log(`Processing loan created: ${id}`);
 
     const loanDetails = await contract.loans(id);
+    console.log(`Loan details for ${id}:`, loanDetails);
     const installments = await contract.getInstallmentSchedule(id);
     const chainId = Number((await provider.getNetwork()).chainId);
 

@@ -16,6 +16,7 @@ exports.LoanSummary = async (req, res) => {
     const downPaymentAmount = parseFloat(req.body.downPaymentAmount) || (0.2 * amountInUSD); // Amount in USD for down payment
 
     const totalLoanAmount = parseFloat(amountInUSD);
+    console.log("Total Loan Amount:", totalLoanAmount);
     const totalLoanAmountRaw = ethers.parseUnits(totalLoanAmount.toString(), 6);
     const downPaymentAmountRaw = ethers.parseUnits(downPaymentAmount.toFixed(6).toString(), 6);
 
@@ -36,6 +37,8 @@ exports.LoanSummary = async (req, res) => {
 
     console.log("Down Payment:", downPayment);
     console.log("Principal:", principal);
+
+    const totalInterestPerYear = (interestRate / 100) * principal;
 
     const openingFee = principal * 0.01;
     const upfrontPayment = downPayment + openingFee;
@@ -92,7 +95,7 @@ exports.LoanSummary = async (req, res) => {
       downPayment : downPayment.toString(),
       principal : principal.toString(),
       monthlyPayment: monthlyPayment.toFixed(2),
-      totalInterest: totalInterest.toFixed(2),
+      totalInterest: totalInterestPerYear.toFixed(2),
       totalPayment: totalPayment.toFixed(2),
       apr: apr.toFixed(2),
       interestRate,
@@ -133,7 +136,7 @@ exports.LoanAvailability = async (req, res) => {
   // Check the amount of USD available in contract -> Use a price feed to convert USD to BTC -> Return the amount of BTC available for loan
   let availableLoanAmountInBTC;
   try {
-    const contractBalanceRaw = await usdc.balanceOf(await contract.getAddress());
+    const contractBalanceRaw = await contract.totalPoolBalance(); // change this to add as terms of lenderbalances
     const contractBalance = ethers.formatUnits(contractBalanceRaw, 6);
     console.log("Contract Balance:", contractBalance);
     // const parsedContractBalance = parseFloat(ethers.formatUnits(contractBalance, 6));
