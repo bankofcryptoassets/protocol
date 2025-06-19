@@ -88,9 +88,20 @@ const getUserDashboard = async (req, res) => {
   }
 };
 
+const getTelegramId = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    res.json({ telegramId: user.telegramId });
+  } catch (err) {
+    console.error("Error in getTelegramId:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUserById,
   updateUser,
   getUserDashboard,
+  getTelegramId,
 };
