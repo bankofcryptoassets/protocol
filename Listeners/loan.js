@@ -2,6 +2,7 @@ const { contract, provider } = require("../constants");
 const Loan = require("../schema/LoaningSchema");
 const User = require("../schema/UserSchema");
 const Lend = require("../schema/LendingSchema"); // Import the allowance schema
+const { sendTelegramMessage } = require("../utils/telegramMessager");
 
 /**
  * Records loan creation events from the blockchain and updates the database
@@ -120,6 +121,8 @@ const processLoanCreatedEvent = async (event) => {
     await user.save();
 
     console.log(`Loan ${id} saved to database`);
+    // Trigger TG Bot notification
+    await sendTelegramMessage(user._id, "Your first step towards being a full coiner is completed. You will recieve notifications on your monthly patment reminders here. You can also check your loan details on the BitMor app.");
   } catch (error) {
     console.error(`Error processing loan created event:`, error);
   }

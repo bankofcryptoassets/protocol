@@ -4,6 +4,7 @@ const cron = require("node-cron");
 const cors = require("cors");
 
 const { connectDB } = require("./utils/db");
+const { bot } = require("./utils/telegramMessager");
 const userRouter = require("./routes/userRouter");
 const authRouter = require("./routes/authRouter");
 const loanRouter = require("./routes/loanRouter");
@@ -54,6 +55,11 @@ cron.schedule("*/5 * * * * *", async () => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(seralizeUser);
+
+bot.launch()
+  .then(() => console.log('Telegram bot is running...'))
+  .catch((error) => console.error('Failed to launch bot:', error));
+
 
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter);

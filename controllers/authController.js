@@ -141,3 +141,27 @@ exports.isLoggedIn = (req, _res, next) => {
     next(new AppError("UnAuthorized Request", 401));
   }
 };
+
+
+exports.telegramLogin = async(req, res, next) => {
+  const { telegramId } = req.body;
+  if(!telegramId) {
+    return next(new AppError("Telegram ID is required", 400));
+  }
+  try {
+    const user = await User.findOne({ _id : req.user._id });
+    if (!user) {
+      return next(new AppError("User not found", 404));
+    }
+    user.telegramId = telegramId;
+    await user.save();
+    res.status(200).json({
+      status: "success",
+      message: "Telegram ID linked successfully",
+      user: user,
+    });
+  } catch (error) {
+    console.error("Error linking Telegram ID:", error);
+    return next(new AppError("Failed to link Telegram ID", 500));
+  }
+}

@@ -2,6 +2,7 @@ const { contract, provider } = require("../constants");
 const Lend = require("../schema/LendingSchema"); // Import the Lend model
 const User = require("../schema/UserSchema"); // Import the User model
 const ethers = require("ethers");
+const { sendTelegramMessage } = require("../utils/telegramMessager");
 
 /**
  * Listens for Deposit events and records them to the database
@@ -77,16 +78,14 @@ const recordDeposit = async () => {
         user.totalCapitalLent = {
           chain_id,
           asset,
-          amount: amount.toString(),
+          amount: amount,
         };
       } else {
         // If user already has capital lent, update it
-        const currentAmount = user.totalCapitalLent.amount || "0";
-        const newAmount = (
-          BigInt(currentAmount) + BigInt(amount.toString())
-        ).toString();
+        const currentAmount = user.totalCapitalLent.amount || 0;
+        const newAmount = currentAmount + amount;
 
-        user.totalCapitalLent.amount = newAmount;
+        user.totalCapitalLent.amount = Number(newAmount);
       }
 
       await user.save();
@@ -94,6 +93,9 @@ const recordDeposit = async () => {
       console.log(
         `Successfully added lending with ID ${lending._id} for user ${user._id}`,
       );
+
+      // Trigger TG Bot notification
+      await sendTelegramMessage(user._id, "Your deposit was recorded successfully, and you will receive notifications on your deposit activities here. You can also check your lending details on the BitMor app.");
     }
   } catch (error) {
     console.error("Error processing deposit events:", error);
