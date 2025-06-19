@@ -7,10 +7,10 @@ async function main() {
   console.log(`Deploying with account: ${deployer.address}`);
 
   // Existing deployed contract addresses
-  const usdcAddress = "0x377faBD7d29562c059Dd2D3A9C41eF6974d26B21";
-  const cbBtcAddress = "0x905DFbD63Eb404E9A6A03B447c037EC7260478cF";
-  const aavePoolAddress = "0x044a1Caf72d89f67a4801bB77F858C9A2795b57A";
-  const swapRouterAddress = "0xb1c026CFce4478DaF34FD72cB8ac959e35823F21";
+  const usdcAddress = "0xe270578586FA80B627a0B84a3D86169B4B515730";
+  const cbBtcAddress = "0xB4BF7595a438a41Dd9f691bfE7AF16A82123dF8d";
+  const aavePoolAddress = "0xa14E6B439De8B7cd36D61b13De49319e85282B99";
+  const swapRouterAddress = "0xea8D7FB0C67236B90485A5983A5927119918fCBF";
   const oracleAddress = "0x0FB99723Aee6f420beAD13e6bBB79b7E6F034298";
 
   // Deploy LendingPool

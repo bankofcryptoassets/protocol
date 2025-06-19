@@ -2,7 +2,8 @@
 
 This project provides the backend for interacting with the Zeistal platform. The API allows users to authenticate, lend, get liquidity, borrow, and interact with contracts with the respinses. All of the calculations are handled here with the responses serving as the indexable data points without any calculations required.
 
-#### LP ADDRESS 
+#### LP ADDRESS
+
 `0xb556F608bf4871f2Cd2A8E59B29ADC18df6a817e`
 
 ## Installation
@@ -14,7 +15,9 @@ git clone <repository-url>
 cd <project-directory>
 npm install
 ```
+
 ## Configuration
+
 Create a `.env` file in the root directory and add the following environment variables:
 
 ```env
@@ -23,12 +26,15 @@ PRIVATE_KEY=<random-private-key>
 ```
 
 ## Running the Project
+
 To run the project, use the following command:
 
 ```bash
-node index.js 
-```  
-or 
+node index.js
+```
+
+or
+
 ```bash
 nodemon index.js
 ```
@@ -45,18 +51,21 @@ To get a summary of a loan for given interest, term(in months) and amount(in BTC
 
 ```json
 {
-  "amount": "1",         
-  "term": 24,               
-  "interestRate": 5.0      
+  "amount": "1",
+  "term": 24,
+  "interestRate": 5.0,
+  "downPaymentAmount": "30000.00"
 }
 ```
 
 **Response:**
+
 ```json
 {
   "status": "success",
   "data": {
     "loanSummary": {
+      "basisPoints" : 3000,
       "loanAmount": 15000,
       "downPayment": "3000.00",
       "openingFee": "120.00",
@@ -95,6 +104,7 @@ To get available Liquiity in BTC
 **Endpoint:** `GET /api/initialisation/loan/availability`
 
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -107,6 +117,7 @@ To get available Liquiity in BTC
 To Get the current price of BTC in USD
 **Endpoint:** `GET /api/initialisation/getBTCPrice?amount=1`
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -119,6 +130,7 @@ To Get the current price of BTC in USD
 To get current price of USD in BTC
 **Endpoint:** `GET /api/initialisation/getUSDPrice?amount=1`
 **Response:**
+
 ```json
 {
   "status": "success",
@@ -127,7 +139,6 @@ To get current price of USD in BTC
   }
 }
 ```
-
 
 ### 1. Authentication
 

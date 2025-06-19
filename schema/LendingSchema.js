@@ -12,11 +12,14 @@ const LendingSchema = new mongoose.Schema({
 
   // Timestamps
   openedOn: { type: Date, required: true },
-  duration_preference: { type: String, required: true },
+  // duration_preference: { type: String, required: true },
 
   updated_at: { type: Date, default: Date.now },
   // Related loans (can be populated as loans are created)
   loans: [{ type: mongoose.Types.ObjectId, ref: "Loan" }],
+  reinvest : { type: Boolean, default: false },
+  txHash: { type: String, required: true },
+  notify : { type: Boolean, default: false },
 });
 
 const Lend = mongoose.model("Lend", LendingSchema);

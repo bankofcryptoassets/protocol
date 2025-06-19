@@ -1,5 +1,6 @@
 const Lend = require("../schema/LendingSchema");
 const User = require("../schema/UserSchema");
+const { globalUSDInvested, uniqueLenders } = require("../utils/helperStats");
 
 // const createLending = async (req, res) => {
 //   console.log("Creating Lending");
@@ -38,7 +39,7 @@ const User = require("../schema/UserSchema");
 const getLendings = async (req, res) => {
   try {
     const lendings = await Lend.find({ user_id: req.user._id }).populate(
-      "user_id loans",
+      "user_id",
     );
     return res.json({ lendings });
   } catch (error) {
@@ -109,8 +110,23 @@ const createAllowance = async (req, res) => {
   }
 };
 
+const stats = async(req, res) => {
+    const totalUSDInvested = await globalUSDInvested();
+    const totallenders = await uniqueLenders();
+    const baseAPR = 0.05;
+    const loanAPR = 0.07;
+
+    res.status(200).json({
+        totalUSDInvested,
+        totallenders,
+        baseAPR,
+        loanAPR,
+    });
+}
+
 module.exports = {
   getLendings,
   getLendingById,
   createAllowance,
+  stats,
 };

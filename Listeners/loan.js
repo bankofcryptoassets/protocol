@@ -2,6 +2,7 @@ const { contract, provider } = require("../constants");
 const Loan = require("../schema/LoaningSchema");
 const User = require("../schema/UserSchema");
 const Lend = require("../schema/LendingSchema"); // Import the allowance schema
+const { sendTelegramMessage } = require("../utils/telegramMessager");
 
 /**
  * Records loan creation events from the blockchain and updates the database
@@ -35,14 +36,11 @@ const processLoanCreatedEvent = async (event) => {
     const { id, amount, collateral, borrower } = event.args;
     console.log(`Processing loan created: ${id}`);
 
-    // 1. Fetch from contract
     const loanDetails = await contract.loans(id);
+    console.log(`Loan details for ${id}:`, loanDetails);
     const installments = await contract.getInstallmentSchedule(id);
     const chainId = Number((await provider.getNetwork()).chainId);
 
-    console.log(loanDetails);
-
-    // 2. Convert BigNumber to JS numbers
     const totalPrincipal = Number(loanDetails.principal) / 1e6;
     const interestRate = Number(loanDetails.interestRate);
     const loanDuration = Number(loanDetails.duration);
@@ -51,7 +49,6 @@ const processLoanCreatedEvent = async (event) => {
     const startTime = new Date(Number(loanDetails.startTime) * 1000);
     const btcPriceAtCreation = Number(loanDetails.btcPriceAtCreation) / 1e8;
 
-    // 3. Calculate additional values
     const interest = (interestRate / 100) * totalPrincipal;
     const totalAmountPayable = totalPrincipal + interest;
     const interestPayableMonth = interest / loanDuration;
@@ -59,70 +56,26 @@ const processLoanCreatedEvent = async (event) => {
     const assetBorrowed = Number(loanDetails.stakedAmount) / 1e8;
     const assetRemaining = assetBorrowed;
     const assetReleasedPerMonth = assetBorrowed / loanDuration;
-    const loanEndDate = new Date(
-      startTime.getTime() + loanDuration * 30 * 24 * 60 * 60 * 1000,
-    );
+    const loanEndDate = new Date(startTime.getTime() + loanDuration * 30 * 24 * 60 * 60 * 1000);
 
-    // 4. Fetch User
     const user = await User.findOne({ user_address: borrower.toLowerCase() });
     if (!user) {
       console.error(`User with wallet address ${borrower} not found`);
       return;
     }
 
-    const [
-      lenders,
-      amounts,
-      receivableInterests,
-      repaidPrincipals,
-      repaidInterests,
-    ] = await contract.getContributions(id);
-    // 6. Fetch contributions
-    const contributions = lenders.map((lender, i) => ({
-      lender,
-      amount: Number(amounts[i]) / 1e6,
-      receivableInterest: Number(receivableInterests[i]) / 1e6,
-      repaidPrincipal: Number(repaidPrincipals[i]) / 1e6,
-      repaidInterest: Number(repaidInterests[i]) / 1e6,
-    }));
-
-    console.log(`Contributions: ${JSON.stringify(contributions)}`);
-
-    await updateAllowancesAfterLoan(id, contributions);
-
-    // 5. Check if loan already exists
     const existingLoan = await Loan.findOne({ loan_id: id });
     if (existingLoan) {
       console.log(`Loan ${id} already exists. Skipping creation.`);
       return;
     }
 
-    // 7. Build lender-related arrays
-    const lendersCapitalInvested = contributions.map((c) => ({
-      user_address: c.lender,
-      amount: c.amount,
-      amount_received: 0,
-      received_interest: 0,
-      total_received: 0,
-      remaining_amount: c.amount,
-    }));
-
-    const receivableAmountMonthlyByLenders = contributions.map((c) => ({
-      user_address: c.lender,
-      amount: c.amount / loanDuration,
-      interest: c.receivableInterest / loanDuration,
-      total_amount: (c.amount + c.receivableInterest) / loanDuration,
-      remaining_amount: c.amount + c.receivableInterest,
-    }));
-
-    // 8. Build amortization schedule
     const amortization_schedule = installments.map((inst) => ({
       duePrincipal: Number(inst.duePrincipal) / 1e6,
       dueInterest: Number(inst.dueInterest) / 1e6,
       paid: inst.paid,
     }));
 
-    // 9. Create new loan entry
     const loan = await Loan.create({
       loan_id: id,
       user_id: user._id,
@@ -148,27 +101,18 @@ const processLoanCreatedEvent = async (event) => {
       liquidation_factor: totalPrincipal - borrowerDeposit,
       openedOn: startTime,
       last_payment_date: startTime,
-      next_payment_date: new Date(
-        startTime.getTime() + 30 * 24 * 60 * 60 * 1000,
-      ),
+      next_payment_date: new Date(startTime.getTime() + 30 * 24 * 60 * 60 * 1000),
       months_not_paid: 0,
       loan_end: loanEndDate,
+      amortization_schedule,
       is_active: true,
       is_liquidated: false,
       is_repaid: false,
       is_defaulted: false,
-      lenders_capital_invested: lendersCapitalInvested,
-      receivable_amount_monthly_by_lenders: receivableAmountMonthlyByLenders,
-      amortization_schedule,
-      lends: [],
-      receivable_amount_By_lenders: [],
-      receivable_interest_by_lenders: 0,
-      payments: [],
-      withdrawable_by_user: [],
+      allowances_updated: false,
       bounce: false,
     });
 
-    // 10. Update user
     user.loans.push(loan._id);
     user.totalCapitalBorrowed = {
       chain_id: chainId,
@@ -178,10 +122,13 @@ const processLoanCreatedEvent = async (event) => {
     await user.save();
 
     console.log(`Loan ${id} saved to database`);
+    // Trigger TG Bot notification
+    await sendTelegramMessage(user._id, "Your first step towards being a full coiner is completed. You will recieve notifications on your monthly patment reminders here. You can also check your loan details on the BitMor app.");
   } catch (error) {
     console.error(`Error processing loan created event:`, error);
   }
 };
+
 /**
  * Process an InstallmentPaid event
  */

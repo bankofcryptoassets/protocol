@@ -1,6 +1,8 @@
 const Lend = require("../schema/LendingSchema");
-const { contract } = require("../constants");
+const { contract, usdc } = require("../constants");
 const { getUSDRate, getBTCRate } = require("../utils/getPrice");
+const { fetchFearGreedIndex } = require("../utils/FGI");
+const { uniqueByUserId, totalLoanedInBTC, totalLoanedinUSD, globalUSDInvested, uniqueLenders } = require("../utils/helperStats");
 const ethers = require("ethers");
 
 exports.LoanSummary = async (req, res) => {
@@ -11,11 +13,20 @@ exports.LoanSummary = async (req, res) => {
     const interestRate = parseFloat(req.body.interestRate);
     const btcPrice = amountInUSD / btcAmount;
 
-    const totalLoanAmount = parseFloat(amountInUSD.toFixed(6));
+    const downPaymentAmount = parseFloat(req.body.downPaymentAmount) || (0.2 * amountInUSD); // Amount in USD for down payment
+
+    const totalLoanAmount = parseFloat(amountInUSD);
+    console.log("Total Loan Amount:", totalLoanAmount);
     const totalLoanAmountRaw = ethers.parseUnits(totalLoanAmount.toString(), 6);
+    const downPaymentAmountRaw = ethers.parseUnits(downPaymentAmount.toFixed(6).toString(), 6);
+
+    const [basisPoints, validPayment] = await contract.getDownPaymentBasisPoints(totalLoanAmountRaw, downPaymentAmountRaw);
+
+    console.log("Basis Points:", basisPoints.toString());
+    console.log("Valid Payment:", validPayment);
 
     // ✅ Call the contract for exact borrower deposit and lender principal
-    const [borrowerDepositRaw, lenderPrincipalRaw] = await contract.computeLoanParts(totalLoanAmountRaw);
+    const [borrowerDepositRaw, lenderPrincipalRaw, isValid] = await contract.getLoanRequirements(totalLoanAmountRaw, basisPoints);
 
     console.log("Borrower Deposit Raw:", borrowerDepositRaw.toString());
     console.log("Lender Principal Raw:", lenderPrincipalRaw.toString());
@@ -26,6 +37,8 @@ exports.LoanSummary = async (req, res) => {
 
     console.log("Down Payment:", downPayment);
     console.log("Principal:", principal);
+
+    const totalInterestPerYear = (interestRate / 100) * principal;
 
     const openingFee = principal * 0.01;
     const upfrontPayment = downPayment + openingFee;
@@ -75,13 +88,14 @@ exports.LoanSummary = async (req, res) => {
     const apr = calculateAPR(monthlyPayment, term, principal);
 
     const loanSummary = {
+      basisPoints: basisPoints.toString(),
       loanAmount: totalLoanAmount.toFixed(2),
       openingFee: openingFee.toFixed(2),
-      upfrontPayment: upfrontPayment.toFixed(2),
+      upfrontPayment: upfrontPayment.toFixed(6).toString(),
       downPayment : downPayment.toString(),
       principal : principal.toString(),
       monthlyPayment: monthlyPayment.toFixed(2),
-      totalInterest: totalInterest.toFixed(2),
+      totalInterest: totalInterestPerYear.toFixed(2),
       totalPayment: totalPayment.toFixed(2),
       apr: apr.toFixed(2),
       interestRate,
@@ -122,16 +136,11 @@ exports.LoanAvailability = async (req, res) => {
   // Check the amount of USD available in contract -> Use a price feed to convert USD to BTC -> Return the amount of BTC available for loan
   let availableLoanAmountInBTC;
   try {
-    const allowances = await Lend.find();
-
-    console.log("Allowances:", allowances);
-
-    const contractBalance = allowances.reduce((acc, allowance) => {
-      return acc + Number.parseFloat(allowance.available_amount);
-    }, 0);
+    const contractBalanceRaw = await contract.totalPoolBalance(); // change this to add as terms of lenderbalances
+    const contractBalance = ethers.formatUnits(contractBalanceRaw, 6);
     console.log("Contract Balance:", contractBalance);
     // const parsedContractBalance = parseFloat(ethers.formatUnits(contractBalance, 6));
-    const btcAmount = await getUSDRate(contractBalance);
+    const btcAmount = await getUSDRate(Number(contractBalance));
 
     const availableLoanAmount = Number.parseFloat(btcAmount);
     availableLoanAmountInBTC = availableLoanAmount;
@@ -144,10 +153,26 @@ exports.LoanAvailability = async (req, res) => {
     availableLoanAmountInBTC = 1;
   }
 
+
+    const fgi = await fetchFearGreedIndex();
+    console.log("Fear & Greed Index:", fgi);
+
+    const btcBorrowers = await uniqueByUserId();
+    const totalLoanInBTC = await totalLoanedInBTC();
+    const totalLoanInUSD = await totalLoanedinUSD();
+
+  console.log("Total Loaned in BTC:", totalLoanInBTC);
+  console.log("Total Loaned in USD:", totalLoanInUSD);
+  console.log("Total Borrowers:", btcBorrowers);
+
   res.status(200).json({
     status: "success",
     data: {
       availableLoanAmountInBTC,
+      fgi,
+      btcBorrowers,
+      totalLoanInBTC,
+      totalLoanInUSD,
     },
   });
 };
@@ -192,4 +217,30 @@ function calculateAPR(monthlyPayment, loanTerm, netLoanAmount) {
   }
 
   return guess * 12 * 100; // Annualize and convert to percentage
+}
+
+exports.getBasisPoints = async(req,res) => {
+  try {
+    const { totalLoanAmount, downPaymentAmount } = req.query;
+
+    if (!totalLoanAmount || !downPaymentAmount) {
+      return res.status(400).json({ error: "Missing required parameters" });
+    }
+
+    const totalLoanAmountRaw = ethers.parseUnits(totalLoanAmount.toString(), 6);
+    const downPaymentAmountRaw = ethers.parseUnits(downPaymentAmount.toString(), 6);
+
+    const [basisPoints, validPayment] = await contract.getDownPaymentBasisPoints(totalLoanAmountRaw, downPaymentAmountRaw);
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        basisPoints: basisPoints.toString(),
+        validPayment: validPayment,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching basis points:", error);
+    res.status(500).json({ status: "error", message: error.message });
+  }
 }
