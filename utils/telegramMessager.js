@@ -21,6 +21,11 @@ async function sendTelegramMessage(userId, message) {
             return;
         }
 
+        if(!user.telegramId) {
+            console.error(`User with ID ${userId} does not have a Telegram ID linked.`);
+            return;
+        }
+
         await bot.telegram.sendMessage(Number(user.telegramId), message);
         console.log(`Message sent to user ${userId}: ${message}`);
     } catch (error) {

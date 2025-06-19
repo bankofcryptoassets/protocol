@@ -7,8 +7,8 @@ const provider = new ethers.JsonRpcProvider(
   "https://sepolia.base.org", // change RPC URL
 );
 
-const contractAddress = "0xb7B9a796E324506dB76db2f69F1dbBef07d01Fc9"; // change
-const USDC_Address = "0x377faBD7d29562c059Dd2D3A9C41eF6974d26B21";
+const contractAddress = "0xFB58f3cB3D0A5a487b043881d83ce58841A12a0f"; // change
+const USDC_Address = "0xe270578586FA80B627a0B84a3D86169B4B515730";
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
 const contract = new ethers.Contract(contractAddress, abi, wallet);
