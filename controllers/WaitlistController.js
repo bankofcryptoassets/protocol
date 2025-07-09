@@ -60,22 +60,26 @@ exports.googleAuthCallback = async (req, res) => {
     // 3. You can now create a user or session
     console.log("Google User Info:", userInfo);
 
-    try{
-        const existingUser = await Waitlist.findOne({ email: userInfo.email });
-       if (!existingUser) {
-         const newWaitlistEntry = await Waitlist.create({
-           email: userInfo.email,
-           name: userInfo.name,
-         });
-         console.log("New waitlist entry created:", newWaitlistEntry);
-        } else {
-         console.log("User already exists in waitlist:", existingUser);
-        }
-    res.redirect(`https://bitmore.vercel.app/`);
-    } catch (err) {
-      console.error("Error saving user to waitlist:", err);
-      res.status(500).send("Failed to save user to waitlist");
-    }
+ try {
+  const existingUser = await Waitlist.findOne({ email: userInfo.email });
+  if (!existingUser) {
+    const newWaitlistEntry = await Waitlist.create({
+      email: userInfo.email,
+      name: userInfo.name,
+    });
+    console.log("New waitlist entry created:", newWaitlistEntry);
+  } else {
+    console.log("User already exists in waitlist:", existingUser);
+  }
+
+  // ✅ Success redirect
+  res.redirect(`https://bitmore.vercel.app/?waitlist_success=true`);
+} catch (err) {
+  console.error("Error saving user to waitlist:", err);
+
+  // ❌ Failure redirect
+  res.redirect(`https://bitmore.vercel.app/?waitlist_success=false`);
+}
     } catch (err) {
     console.error("OAuth Error:", err.response?.data || err.message);
     res.status(500).send("Failed to authenticate with Google");
