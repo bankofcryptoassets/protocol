@@ -7,7 +7,7 @@ async function main() {
   console.log(`Using deployer: ${deployer.address}`);
 
   // Deployed MockDeployer address
-  const MOCK_DEPLOYER_ADDRESS = "0x45dF8BF8Ed77Fe7c7549f85edc6ca085beF82D51";
+  const MOCK_DEPLOYER_ADDRESS = "0x35264a16E7F0a98B5c154266C87C563898216989";
 
   // Attach to the deployed MockDeployer contract
   const MockDeployer = await ethers.getContractFactory("MockDeployer");

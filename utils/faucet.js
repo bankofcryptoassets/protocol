@@ -42,11 +42,11 @@ async function faucet(targetAddress) {
     ethers.formatUnits(await usdc.balanceOf(deployer.address), 6),
   );
 
-  if (hasUSDC) {
-    console.log("Address already has USDC. Doing nothing.");
-    walletIsVirgin = false;
-    return walletIsVirgin;
-  }
+  // if (hasUSDC) {
+  //   console.log("Address already has USDC. Doing nothing.");
+  //   walletIsVirgin = false;
+  //   return walletIsVirgin;
+  // }
 
   console.log("Address has no USDC. Sending USDC...");
   // 3. Send USDC
