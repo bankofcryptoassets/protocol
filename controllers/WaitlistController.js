@@ -64,7 +64,8 @@ exports.googleAuthCallback = async (req, res) => {
         const existingUser = await Waitlist.findOne({ email: userInfo.email });
        if (!existingUser) {
          const newWaitlistEntry = await Waitlist.create({
-           email: userInfo.email
+           email: userInfo.email,
+           name: userInfo.name,
          });
          console.log("New waitlist entry created:", newWaitlistEntry);
         } else {
@@ -80,3 +81,24 @@ exports.googleAuthCallback = async (req, res) => {
     res.status(500).send("Failed to authenticate with Google");
   }
 };
+
+  exports.addEmailToWaitlist = async (req, res) => {    
+    const { email, name } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    try {
+      const existingUser = await Waitlist.findOne({ email });
+      if (existingUser) {
+        return res.status(409).json({ message: "Email already exists in waitlist" });
+      }
+
+      const waitlistData = { email };
+      const newWaitlistEntry = await Waitlist.create(waitlistData);
+      res.status(201).json({ message: "Email added to waitlist", user: newWaitlistEntry });
+    } catch (error) {
+      console.error("Error adding email to waitlist:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  };

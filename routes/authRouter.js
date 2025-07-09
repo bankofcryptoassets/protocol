@@ -1,7 +1,8 @@
 const { getNonce, verifyUser, telegramLogin, isLoggedIn } = require("../controllers/authController");
 const {
     googleAuthCallback,
-    googleAuthRedirect
+    googleAuthRedirect,
+    addEmailToWaitlist
 } = require('../controllers/WaitlistController');
 
 const router = require("express").Router();
@@ -15,5 +16,7 @@ router.post("/telegram", isLoggedIn, telegramLogin);
 router.get('/google', googleAuthRedirect);
 // Handle Google OAuth callback
 router.get('/google/callback', googleAuthCallback);
+
+router.post('/waitlist', addEmailToWaitlist);
 
 module.exports = router;
