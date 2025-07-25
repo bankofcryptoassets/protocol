@@ -3,6 +3,7 @@ const Lend = require("../schema/LendingSchema"); // Import the Lend model
 const User = require("../schema/UserSchema"); // Import the User model
 const ethers = require("ethers");
 const { sendTelegramMessage } = require("../utils/telegramMessager");
+const { sendEmail } = require("../utils/sendEmail");
 
 /**
  * Listens for Deposit events and records them to the database
@@ -100,6 +101,10 @@ const recordDeposit = async () => {
 
       // Trigger TG Bot notification
       await sendTelegramMessage(user._id, "Your deposit was recorded successfully, and you will receive notifications on your deposit activities here. You can also check your lending details on the BitMor app.");
+      await sendEmail("deposit", user.email, {
+                      name: user.name,
+                      amount: amount, // USDC
+                      });
       lending.notify = true; // Set notify to true for the lending record
       await lending.save();
       

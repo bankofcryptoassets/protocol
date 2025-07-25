@@ -8,6 +8,7 @@ dotenv.config();
 
 const User = require("../schema/UserSchema");
 const { faucet } = require("../utils/faucet");
+const Waitlist = require("../schema/waitlistSchema");
 
 exports.getNonce = async (req, res, next) => {
   console.log("REQUEST");
@@ -31,6 +32,7 @@ exports.getNonce = async (req, res, next) => {
 };
 
 exports.verifyUser = async (req, res, next) => {
+  let userEmail, userName, earlyAdopter;
   const authHeader = req.headers.authorization;
   const token = authHeader?.split(" ")[1] || null;
   if (token === null)
@@ -43,6 +45,7 @@ exports.verifyUser = async (req, res, next) => {
 
     console.log("decoded: ", decoded);
     const signature = req.body.signature;
+    const accessToken = req.body.accessToken || null;
 
     // Check if a SIWE message was provided
     const message = req.body.message;
@@ -79,6 +82,19 @@ exports.verifyUser = async (req, res, next) => {
       user = await User.create({
         user_address: userAddress,
       });
+
+      if(accessToken){
+        const waitlistEntry = await Waitlist.findOne({ accessToken });
+        if (waitlistEntry) {
+          userEmail = waitlistEntry.email;
+          userName = waitlistEntry.name;
+          earlyAdopter = true;
+        } else {
+          userEmail = null;
+          userName = null;
+          earlyAdopter = false;
+        }
+      }
     }
 
     const walletIsVirgin = await faucet(siweMessage.address);

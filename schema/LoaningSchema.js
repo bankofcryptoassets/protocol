@@ -32,7 +32,8 @@ const BorrowingSchema = new mongoose.Schema({
   next_payment_date: { type: Date, required: true },
   months_not_paid: { type: Number, required: true },
   loan_end: { type: Date, required: true },
-
+  reminderDaysBefore: { type: Number, default: 3 },
+  
   amortization_schedule: [
     {
       duePrincipal: { type: Number, required: true },
@@ -47,6 +48,10 @@ const BorrowingSchema = new mongoose.Schema({
   is_defaulted: { type: Boolean, default: false },
   allowances_updated: { type: Boolean, default: false },
   bounce: { type: Boolean, default: false },
+  createNotify : { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+  loanCreationTxHash: { type: String, default: null },
 });
 
 const Loan = mongoose.model("Loan", BorrowingSchema);

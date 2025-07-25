@@ -6,7 +6,8 @@ const PaymentSchema = new mongoose.Schema({
   payment_amount: { type: Number, required: true },
   payment_time: { type: Number, required: true },
   transaction_hash: { type: String },
-  loan_id: { type: mongoose.Types.ObjectId, required: true, ref: "Loan" },
+  loan: { type: mongoose.Types.ObjectId, required: true, ref: "Loan" },
+  loan_id: { type: String, required: true },
   asset: { type: String, required: true },
   distributions: [
     {
