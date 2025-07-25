@@ -187,6 +187,73 @@ class InsuranceService {
   async getInsuranceByLoanId(loanId) {
     return Insurance.findOne({ loan_id: loanId, is_active: true });
   }
+
+  async calculateInsuranceDetailsFromAmount(btcAmount) {
+  try {
+    const btcPrice = await getBTCRate(); // Your util to get BTC/USD rate
+
+    // Step 1: Adjust BTC quantity
+    const btcQuantity = Math.max(btcAmount, 0.1); // Enforce 0.1 minimum
+    const insuredAmount = btcQuantity * btcPrice;
+    const strikeTarget = insuredAmount / btcQuantity;
+
+    // Step 2: Calculate expiry = Last Friday of month, 1 year from now
+    const oneYearLater = new Date();
+    oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+    const expiryDate = getLastFridayOfMonth(oneYearLater.getFullYear(), oneYearLater.getMonth());
+
+    const monthStr = expiryDate.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+    const dayStr = expiryDate.getDate().toString();
+    const yearStr = expiryDate.getFullYear().toString().slice(-2);
+    const instrumentPrefix = `BTC-${dayStr}${monthStr}${yearStr}`;
+
+    // Step 3: Get all BTC PUT options
+    const instruments = await this.deribit.getInstruments('BTC', 'option');
+    const puts = instruments.result
+      .filter(inst => inst.instrument_name.startsWith(instrumentPrefix))
+      .filter(inst => inst.instrument_name.endsWith('-P'));
+
+    if (!puts.length) throw new Error("No suitable PUT options found");
+
+    // Step 4: Find closest strike
+    const closestPut = puts
+      .map(inst => ({
+        ...inst,
+        strikeDiff: Math.abs(inst.strike - strikeTarget)
+      }))
+      .sort((a, b) => a.strikeDiff - b.strikeDiff)[0];
+
+    if (!closestPut) throw new Error("No PUT option found close to strike");
+
+    // Step 5: Enforce minimum quantity
+    const minQty = closestPut.min_trade_amount || 0.1;
+    const finalQty = Number((Math.ceil(btcQuantity / minQty) * minQty).toFixed(2));
+
+    // Step 6: Get mark price (estimate per-BTC premium)
+    const book = await this.deribit.request('GET', '/public/ticker', {
+      instrument_name: closestPut.instrument_name,
+    });
+
+    const markPrice = book.result.mark_price;
+    const estimatedPremiumBTC = markPrice * finalQty;
+    const estimatedPremiumUSD = estimatedPremiumBTC * btcPrice;
+
+    return {
+      btcQuantity: finalQty,
+      insuredAmount,
+      strikePrice: closestPut.strike,
+      instrumentName: closestPut.instrument_name,
+      expiryDate: new Date(closestPut.expiration_timestamp),
+      markPrice,
+      estimatedPremiumBTC,
+      estimatedPremiumUSD,
+    };
+  } catch (err) {
+    console.error("Error in calculateInsuranceDetailsFromAmount:", err);
+    throw new Error(err.message);
+  }
+}
+
 }
 
 module.exports = new InsuranceService(); 
