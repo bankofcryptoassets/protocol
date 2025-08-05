@@ -1,4 +1,6 @@
 const nodemailer = require("nodemailer");
+const dotenv = require("dotenv");
+dotenv.config();
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -8,12 +10,15 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+console.log("Email transporter created:", transporter);
+
 const templates = {
-  welcome: (name) => ({
-    subject: "Welcome to BitMor – You're On the Waitlist 🎉",
-    html: `
-      <p>Hi ${name || "there"},</p>
-      <p>Thanks for joining the <strong>BitMor</strong> waitlist – we're thrilled to have you on board! 🚀</p>
+  welcome: ({name}) => (
+    {
+      subject: "Welcome to BitMor – You're On the Waitlist 🎉",
+      html: `
+        <p>Hi ${name || "there"},</p>
+        <p>Thanks for joining the <strong>BitMor</strong> waitlist – we're thrilled to have you on board! 🚀</p>
       <p>You're now in line to be among the first to experience our next-gen crypto products. We'll keep you updated on major releases, early access perks, and community events.</p>
       <p>If you have any questions, just reply to this email – we'd love to hear from you.</p>
       <br>
@@ -71,10 +76,16 @@ const templates = {
 exports.sendEmail = async (type, toEmail, data = {}) => {
   if (!templates[type]) throw new Error(`Unknown email type: ${type}`);
 
+  console.log(`Sending email of type: ${type} to ${toEmail}`);
+
+  console.log("Email data:", data);
+  if(data.name === undefined) {
+    data.name = "full-coiner";
+  }
   const { subject, html } = templates[type](data);
 
   const mailOptions = {
-    from: `"BitMor" <${process.env.EMAIL_USER}>`,
+    from: `${process.env.EMAIL_USER}`,
     to: toEmail,
     subject,
     html,
