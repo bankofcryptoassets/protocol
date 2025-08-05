@@ -1,6 +1,9 @@
 const { contract, provider } = require("../constants");
 const Payment = require("../schema/PaymentSchema");
 const Loan = require("../schema/LoaningSchema");
+const User = require("../schema/UserSchema");
+const { sendEmail } = require("../utils/sendEmail");
+const { sendTelegramMessage } = require("../utils/telegramMessager");
 
 const recordPayoutEvents = async () => {
   try {
@@ -111,7 +114,8 @@ const processPayoutEvent = async (event) => {
       user_address: borrower,
       payment_amount: amount.toNumber(),
       payment_time: now.getTime(),
-      loan_id: loan._id,
+      loan: loan._id,
+      loan_id: loanId,
       asset: loan.asset,
       distributions,
       transaction_hash: event.transactionHash,
@@ -132,7 +136,18 @@ const processPayoutEvent = async (event) => {
     // };
     // await user.save();
     // console.log(`User ${borrower} updated with new total capital borrowed`);
+    const user = await User.findOne({ user_address: borrower });
 
+    await sendTelegramMessage(
+          user._id,
+          "We’ve received your payment successfully. ✅\n\nKeep going — you're one step closer to owning your asset outright. You can track your loan progress anytime on the BitMor app."
+        );
+
+    await sendEmail("payment", user.email, {
+      name: user.name,
+      amount: amount.toNumber(),
+      loanId: loanId,
+    });
     console.log(
       `Payment recorded for loan ${loanId}, tx: ${event.transactionHash}`,
     );

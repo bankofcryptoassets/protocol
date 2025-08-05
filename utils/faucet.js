@@ -18,6 +18,7 @@ async function faucet(targetAddress) {
   const network = await provider.getNetwork();
   console.log(`Network: ${network.name} (${network.chainId})`);
   const ethBalance = await provider.getBalance(targetAddress);
+  const deployerEthBalance = await provider.getBalance(deployer.address);
   const hasEth = ethBalance > ethers.parseUnits("0.0001", "ether"); // adjust threshold if needed
 
   console.log(
@@ -25,8 +26,20 @@ async function faucet(targetAddress) {
   );
 
   if (!hasEth) {
-    console.log("Address has no ETH. Doing nothing.");
-    return;
+    console.log(
+      `Address ${targetAddress} has no ETH. Sending 0.0001 ETH...`,
+    );
+    if( deployerEthBalance < ethers.parseUnits("0.001", "ether")) {
+      console.error(
+        `Deployer ${deployer.address} has insufficient ETH balance: ${ethers.formatUnits(deployerEthBalance, "ether")} ETH`,
+      );
+    }
+    const tx = await deployer.sendTransaction({
+      to: targetAddress,
+      value: ethers.parseUnits("0.001", "ether"),
+    });
+    await tx.wait();
+    console.log(`Transaction hash: ${tx.hash}`);
   }
 
   // 2. Check USDC balance

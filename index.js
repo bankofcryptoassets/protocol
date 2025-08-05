@@ -12,12 +12,14 @@ const paymentRouter = require("./routes/paymentRouter");
 const lendingRouter = require("./routes/lendRouter");
 const loanInitialisationRouter = require("./routes/initialisationRouter");
 const insuranceRouter = require("./routes/insuranceRouter");
+const socialsRouter = require("./routes/socialsRouter");
 
 const { seralizeUser } = require("./controllers/authController");
 const { recordDeposit } = require("./Listeners/deposit");
 const { recordLoanEvents } = require("./Listeners/loan");
 const { recordPayoutEvents } = require("./Listeners/payment");
 const { runAutoPayout } = require("./engine/autoPayCron");
+const { runReminderJob } = require("./engine/reminder");
 
 require("dotenv").config();
 
@@ -52,6 +54,12 @@ cron.schedule("*/5 * * * * *", async () => {
   await runAutoPayout();
 });
 
+// schedule cron for every day at 9 AM
+cron.schedule("0 9 * * *", () => {
+  console.log("Running reminder cron...");
+  runReminderJob();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(seralizeUser);
@@ -68,6 +76,7 @@ app.use("/api/payment", paymentRouter);
 app.use("/api/lending", lendingRouter);
 app.use("/api/initialisation", loanInitialisationRouter);
 app.use("/api/insurance", insuranceRouter);
+app.use("/api/socials", socialsRouter);
 
 app.get("/", async (req, res) => {
   return res.json({ message: "Hello World" });

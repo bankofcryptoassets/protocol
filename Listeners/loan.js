@@ -36,6 +36,14 @@ const processLoanCreatedEvent = async (event) => {
     const { id, amount, collateral, borrower } = event.args;
     console.log(`Processing loan created: ${id}`);
 
+    const alreadyExists = await Loan.findOne({ loanCreationTxHash : event.transactionHash });
+    
+    if (alreadyExists) {
+      console.log(`Loan creation already processed for transaction ${alreadyExists.loanCreationTxHash}`);
+      return;
+    }
+
+
     const loanDetails = await contract.loans(id);
     console.log(`Loan details for ${id}:`, loanDetails);
     const installments = await contract.getInstallmentSchedule(id);
@@ -124,6 +132,12 @@ const processLoanCreatedEvent = async (event) => {
     console.log(`Loan ${id} saved to database`);
     // Trigger TG Bot notification
     await sendTelegramMessage(user._id, "Your first step towards being a full coiner is completed. You will recieve notifications on your monthly patment reminders here. You can also check your loan details on the BitMor app.");
+    await sendEmail("loan", user.email, {
+      name: user.name,
+      loanId: loan.loan_id,
+      amount: loan.loan_amount,
+      asset: loan.asset,
+    });
   } catch (error) {
     console.error(`Error processing loan created event:`, error);
   }

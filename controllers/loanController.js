@@ -194,10 +194,37 @@ const matchLenders = async (req, res) => {
   }
 };
 
+const reminderUpdate = async (req, res) => {
+  const { reminderDaysBefore, loanId } = req.body;
+  let loan;
+
+  if (reminderDaysBefore == null || reminderDaysBefore < 0) {
+    return res.status(400).json({ error: "Valid reminderDaysBefore is required" });
+  }
+
+  try {
+    loan = await Loan.findOne({ loan_id : loanId });
+    if(!loan){
+      loan = await Loan.findById(loanId);
+    }
+
+    if (!loan) return res.status(404).json({ error: "Loan not found" });
+
+    loan.reminderDaysBefore = reminderDaysBefore;
+    await loan.save();
+
+    res.status(200).json({ message: "Reminder preference updated", loan });
+  } catch (err) {
+    console.error("Error setting reminder preference:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 module.exports = {
   getLoans,
   getLoanById,
   initialDetails,
   matchLenders,
   getLoanByAddress,
+  reminderUpdate
 };

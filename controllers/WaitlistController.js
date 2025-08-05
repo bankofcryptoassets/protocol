@@ -2,6 +2,9 @@ const axios = require("axios");
 const qs = require("querystring");
 const Waitlist = require("../schema/waitlistSchema");
 const dotenv = require("dotenv");
+const { sendEmail } = require("../utils/sendEmail");
+const { nanoid } = require("nanoid");
+
 dotenv.config();
 
 const GOOGLE_AUTH_BASE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -63,10 +66,13 @@ exports.googleAuthCallback = async (req, res) => {
  try {
   const existingUser = await Waitlist.findOne({ email: userInfo.email });
   if (!existingUser) {
+    const accessToken = nanoid(); // Generate a unique access token
     const newWaitlistEntry = await Waitlist.create({
       email: userInfo.email,
       name: userInfo.name,
+      accessToken: accessToken,
     });
+    await sendEmail("welcome", userInfo.email, { name: userInfo.name });
     console.log("New waitlist entry created:", newWaitlistEntry);
   } else {
     console.log("User already exists in waitlist:", existingUser);
