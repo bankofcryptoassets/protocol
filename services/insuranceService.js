@@ -188,72 +188,130 @@ class InsuranceService {
     return Insurance.findOne({ loan_id: loanId, is_active: true });
   }
 
-  async calculateInsuranceDetailsFromAmount(btcAmount) {
+async calculateInsuranceDetailsFromAmount(btcAmount) {
   try {
-    const btcPrice = await getBTCRate(); // Your util to get BTC/USD rate
+    const btcPrice = await getBTCRate(btcAmount); // Current BTC/USD rate
 
-    // Step 1: Adjust BTC quantity
-    const btcQuantity = Math.max(btcAmount, 0.1); // Enforce 0.1 minimum
+    // Step 1: Adjust BTC quantity to minimum 0.1
+    const btcQuantity = Math.max(btcAmount, 0.1);
     const insuredAmount = btcQuantity * btcPrice;
-    const strikeTarget = insuredAmount / btcQuantity;
 
-    // Step 2: Calculate expiry = Last Friday of month, 1 year from now
-    const oneYearLater = new Date();
-    oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
-    const expiryDate = getLastFridayOfMonth(oneYearLater.getFullYear(), oneYearLater.getMonth());
-
-    const monthStr = expiryDate.toLocaleString('en-US', { month: 'short' }).toUpperCase();
-    const dayStr = expiryDate.getDate().toString();
-    const yearStr = expiryDate.getFullYear().toString().slice(-2);
-    const instrumentPrefix = `BTC-${dayStr}${monthStr}${yearStr}`;
-
-    // Step 3: Get all BTC PUT options
+    // Step 2: Get all available BTC options from Deribit first
     const instruments = await this.deribit.getInstruments('BTC', 'option');
-    const puts = instruments.result
-      .filter(inst => inst.instrument_name.startsWith(instrumentPrefix))
-      .filter(inst => inst.instrument_name.endsWith('-P'));
-
-    if (!puts.length) throw new Error("No suitable PUT options found");
-
-    // Step 4: Find closest strike
-    const closestPut = puts
+    
+    // Filter for active PUT options only
+    const allPutOptions = instruments.result
+      .filter(inst => inst.instrument_name.endsWith('-P'))
+      .filter(inst => inst.is_active)
       .map(inst => ({
         ...inst,
-        strikeDiff: Math.abs(inst.strike - strikeTarget)
+        expiryDate: new Date(inst.expiration_timestamp)
+      }))
+      .sort((a, b) => b.expiration_timestamp - a.expiration_timestamp); // Sort by expiry, latest first
+
+    if (!allPutOptions.length) {
+      throw new Error("No active PUT options found on Deribit");
+    }
+
+    // Step 3: Find the furthest expiry date available (closest to 1 year if possible)
+    const now = new Date();
+    const oneYearFromNow = new Date();
+    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+    
+    // Get the furthest available expiry (Deribit usually has 3-6 months max)
+    const furthestExpiry = allPutOptions[0].expiryDate;
+    
+    console.log("Available expiry dates:");
+    const uniqueExpiries = [...new Set(allPutOptions.map(opt => opt.expiryDate.toDateString()))];
+    uniqueExpiries.forEach(expiry => console.log(" -", expiry));
+    console.log("Selected furthest expiry:", furthestExpiry.toDateString());
+
+    // Step 4: Filter PUT options for the selected expiry date
+    const putOptions = allPutOptions.filter(opt => 
+      opt.expiration_timestamp === allPutOptions[0].expiration_timestamp
+    );
+
+    console.log(`Found ${putOptions.length} PUT options for expiry ${furthestExpiry.toDateString()}`);
+
+    // Step 5: Find PUT option with strike price closest to current BTC price
+    // This provides protection if BTC drops below current price
+    const targetStrike = btcPrice; // Protect at current BTC price
+    
+    const closestPutOption = putOptions
+      .map(inst => ({
+        ...inst,
+        strikeDiff: Math.abs(inst.strike - targetStrike)
       }))
       .sort((a, b) => a.strikeDiff - b.strikeDiff)[0];
 
-    if (!closestPut) throw new Error("No PUT option found close to strike");
+    if (!closestPutOption) {
+      throw new Error("No suitable PUT option found");
+    }
 
-    // Step 5: Enforce minimum quantity
-    const minQty = closestPut.min_trade_amount || 0.1;
-    const finalQty = Number((Math.ceil(btcQuantity / minQty) * minQty).toFixed(2));
+    // Step 6: Adjust quantity to meet minimum trade requirements
+    const minTradeAmount = closestPutOption.min_trade_amount || 0.1;
+    const adjustedQuantity = Math.max(btcQuantity, minTradeAmount);
+    const finalQuantity = Number(
+      (Math.ceil(adjustedQuantity / minTradeAmount) * minTradeAmount).toFixed(2)
+    );
 
-    // Step 6: Get mark price (estimate per-BTC premium)
-    const book = await this.deribit.request('GET', '/public/ticker', {
-      instrument_name: closestPut.instrument_name,
+    // Step 7: Get current market pricing for the option
+    const ticker = await this.deribit.request('GET', '/public/ticker', {
+      instrument_name: closestPutOption.instrument_name,
     });
 
-    const markPrice = book.result.mark_price;
-    const estimatedPremiumBTC = markPrice * finalQty;
+    const markPrice = ticker.result.mark_price; // Price per BTC of the option
+    const bidPrice = ticker.result.best_bid_price;
+    const askPrice = ticker.result.best_ask_price;
+    
+    // Calculate total premium costs
+    const estimatedPremiumBTC = markPrice * finalQuantity;
     const estimatedPremiumUSD = estimatedPremiumBTC * btcPrice;
+    
+    // Calculate bid/ask spread for better pricing info
+    const bidPremiumBTC = bidPrice * finalQuantity;
+    const askPremiumBTC = askPrice * finalQuantity;
+    const bidPremiumUSD = bidPremiumBTC * btcPrice;
+    const askPremiumUSD = askPremiumBTC * btcPrice;
 
     return {
-      btcQuantity: finalQty,
+      btcQuantity: finalQuantity,
+      originalAmount: btcAmount,
       insuredAmount,
-      strikePrice: closestPut.strike,
-      instrumentName: closestPut.instrument_name,
-      expiryDate: new Date(closestPut.expiration_timestamp),
+      currentBtcPrice: btcPrice,
+      strikePrice: closestPutOption.strike,
+      instrumentName: closestPutOption.instrument_name,
+      expiryDate: new Date(closestPutOption.expiration_timestamp),
+      
+      // Pricing information
       markPrice,
+      bidPrice,
+      askPrice,
+      
+      // Premium costs (what you'll pay for the insurance)
       estimatedPremiumBTC,
       estimatedPremiumUSD,
+      bidPremiumBTC,
+      bidPremiumUSD,
+      askPremiumBTC,
+      askPremiumUSD,
+      
+      // Additional info
+      minTradeAmount,
+      instrumentDetails: {
+        strike: closestPutOption.strike,
+        expiration: new Date(closestPutOption.expiration_timestamp),
+        isActive: closestPutOption.is_active,
+        tickSize: closestPutOption.tick_size,
+        contractSize: closestPutOption.contract_size
+      }
     };
-  } catch (err) {
-    console.error("Error in calculateInsuranceDetailsFromAmount:", err);
-    throw new Error(err.message);
+
+  } catch (error) {
+    console.error("Error in calculateInsuranceDetailsFromAmount:", error);
+    throw new Error(`Failed to calculate insurance details: ${error.message}`);
   }
 }
-
 }
 
 module.exports = new InsuranceService(); 

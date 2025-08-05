@@ -1,0 +1,8 @@
+POST http://localhost:3000/api/initialisation/loansummary HTTP/1.1
+content-type: application/json
+
+{
+    "amount" : 1,
+    "term" : 12,
+    "interestRate" : 8
+}
