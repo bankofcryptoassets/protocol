@@ -3,6 +3,7 @@ const { contract, usdc } = require("../constants");
 const { getUSDRate, getBTCRate } = require("../utils/getPrice");
 const { fetchFearGreedIndex } = require("../utils/FGI");
 const { uniqueByUserId, totalLoanedInBTC, totalLoanedinUSD, globalUSDInvested, uniqueLenders } = require("../utils/helperStats");
+const InsuranceService  = require("../services/insuranceService")
 const ethers = require("ethers");
 
 exports.LoanSummary = async (req, res) => {
@@ -87,6 +88,11 @@ exports.LoanSummary = async (req, res) => {
     const totalPayment = monthlyPayment * term;
     const apr = calculateAPR(monthlyPayment, term, principal);
 
+    const insuranceAmount = await InsuranceService.calculateInsuranceDetailsFromAmount(btcAmount);
+    console.log("Insurance Details:", insuranceAmount);
+    console.log("Insurance Amount:", insuranceAmount.estimatedPremiumUSD);
+
+
     const loanSummary = {
       basisPoints: basisPoints.toString(),
       loanAmount: totalLoanAmount.toFixed(2),
@@ -119,6 +125,7 @@ exports.LoanSummary = async (req, res) => {
         borrowerDeposit: borrowerDepositRaw.toString(),
         lenderPrincipal: lenderPrincipalRaw.toString(),
       },
+      insuranceInUSD : insuranceAmount.estimatedPremiumUSD
     };
 
     // console.log(loanSummary);
