@@ -240,13 +240,13 @@ contract MockUSDC is ERC20, Ownable {
 }
 
 /**
- * @title MockCbBTC
- * @dev A simplified mock of the cbBTC (Coinbase Wrapped BTC) token
+ * @title MockWCBTC
+ * @dev A simplified mock of the WCBTC (Coinbase Wrapped BTC) token
  */
-contract MockCbBTC is ERC20, Ownable {
+contract MockWCBTC is ERC20, Ownable {
     uint8 private _decimals = 8; // BTC has 8 decimals
 
-    constructor() public ERC20("Mock Coinbase BTC", "cbBTC") Ownable(msg.sender) {}
+    constructor() public ERC20("Mock WCBTC", "WCBTC") Ownable(msg.sender) {}
 
     /**
      * @dev Returns the number of decimals used for token
@@ -269,7 +269,7 @@ contract MockCbBTC is ERC20, Ownable {
      * @param amount The amount of tokens to mint
      */
     function faucet(uint256 amount) external {
-        require(amount <= 1 * (10 ** decimals()), "Faucet limited to 1 cbBTC");
+        require(amount <= 1 * (10 ** decimals()), "Faucet limited to 1 WCBTC");
         _mint(msg.sender, amount);
     }
 }
@@ -367,7 +367,7 @@ contract MockBTCPriceOracle {
 contract MockDeployer {
     // Deployed contract addresses
     MockUSDC public usdc;
-    MockCbBTC public cbBtc;
+    MockWCBTC public wcbtc;
     MockAavePool public aavePool;
     MockSwapRouter public swapRouter;
     MockBTCPriceOracle public priceOracle;
@@ -380,7 +380,7 @@ contract MockDeployer {
     // Events
     event Deployed(
         address usdc,
-        address cbBtc,
+        address wcbtc,
         address aavePool,
         address swapRouter,
         address priceOracle
@@ -398,7 +398,7 @@ contract MockDeployer {
     function deploy() external {
         // Deploy tokens
         usdc = new MockUSDC();
-        cbBtc = new MockCbBTC();
+        wcbtc = new MockWCBTC();
         
         // Deploy infrastructure
         aavePool = new MockAavePool();
@@ -407,7 +407,7 @@ contract MockDeployer {
         
         emit Deployed(
             address(usdc),
-            address(cbBtc),
+            address(wcbtc),
             address(aavePool),
             address(swapRouter),
             address(priceOracle)
@@ -422,29 +422,29 @@ contract MockDeployer {
         
         // Mint initial tokens for liquidity
         usdc.mint(address(this), INITIAL_USDC_LIQUIDITY);
-        cbBtc.mint(address(this), INITIAL_BTC_LIQUIDITY);
+        wcbtc.mint(address(this), INITIAL_BTC_LIQUIDITY);
         
-        // Set exchange rate in swap router (USDC:cbBTC = 103000:1)
+        // Set exchange rate in swap router (USDC:WCBTC = 103000:1)
         usdc.approve(address(swapRouter), INITIAL_USDC_LIQUIDITY);
-        cbBtc.approve(address(swapRouter), INITIAL_BTC_LIQUIDITY);
+        wcbtc.approve(address(swapRouter), INITIAL_BTC_LIQUIDITY);
         
         // Set exchange rate - 1 BTC = 103,000 USDC
         // For price precision, we use the ratio based on smallest units
-        // usdc (6 decimals) to cbBtc (8 decimals)
+        // usdc (6 decimals) to WCBTC (8 decimals)
         // 103000 * 10^6 : 1 * 10^8
         swapRouter.setExchangeRate(
             address(usdc),
-            address(cbBtc),
+            address(wcbtc),
             103000 * 10**6, // numerator (USDC)
-            1 * 10**8       // denominator (cbBTC)
+            1 * 10**8       // denominator (WCBTC)
         );
         
         // Add initial liquidity by transferring tokens to the router
         usdc.transfer(address(swapRouter), INITIAL_USDC_LIQUIDITY);
-        cbBtc.transfer(address(swapRouter), INITIAL_BTC_LIQUIDITY);
+        wcbtc.transfer(address(swapRouter), INITIAL_BTC_LIQUIDITY);
         
-        // Set Aave interest rates - 5% for cbBTC
-        aavePool.setInterestRate(address(cbBtc), 500); // 5% = 500 basis points
+        // Set Aave interest rates - 5% for WCBTC
+        aavePool.setInterestRate(address(wcbtc), 500); // 5% = 500 basis points
         
         emit Initialized(
             INITIAL_USDC_LIQUIDITY,
@@ -457,7 +457,7 @@ contract MockDeployer {
      * @dev Mints test tokens for a user
      * @param user Address to receive tokens
      * @param usdcAmount Amount of USDC to mint
-     * @param btcAmount Amount of cbBTC to mint
+     * @param btcAmount Amount of WCBTC to mint
      */
     function mintTestTokens(address user, uint256 usdcAmount, uint256 btcAmount) external {
         require(address(usdc) != address(0), "Deploy contracts first");
@@ -467,7 +467,7 @@ contract MockDeployer {
         }
         
         if (btcAmount > 0) {
-            cbBtc.mint(user, btcAmount);
+            wcbtc.mint(user, btcAmount);
         }
     }
     
@@ -485,14 +485,14 @@ contract MockDeployer {
      */
     function getAddresses() external view returns (
         address usdcAddress,
-        address cbBtcAddress,
+        address WCBTCAddress,
         address aavePoolAddress,
         address swapRouterAddress,
         address priceOracleAddress
     ) {
         return (
             address(usdc),
-            address(cbBtc),
+            address(wcbtc),
             address(aavePool),
             address(swapRouter),
             address(priceOracle)

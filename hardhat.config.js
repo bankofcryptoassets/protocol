@@ -26,5 +26,12 @@ module.exports = {
         mnemonic: process.env.MNEMONIC ?? "",
       },
     },
+    citrea : {
+      url : "https://rpc.testnet.citrea.xyz",
+      accounts : {
+      mnemonic: process.env.MNEMONIC ?? "",
+      },
+    },
+    
   },
 };

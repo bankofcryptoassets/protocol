@@ -4,11 +4,11 @@ const { abi : abiUSDC } = require("./artifacts/Contracts/Helper.sol/MockUSDC.jso
 require("dotenv").config();
 
 const provider = new ethers.JsonRpcProvider(
-  "https://sepolia.base.org", // change RPC URL
+  "https://rpc.testnet.citrea.xyz", // change RPC URL
 );
 
-const contractAddress = "0x80822a4BC3Ad8659686e2F44a24c70B47Cd5905b"; // change
-const USDC_Address = "0xe270578586FA80B627a0B84a3D86169B4B515730";
+const contractAddress = "0x841AE47DAAbaB076b7A66457282731d01b09B750"; // change
+const USDC_Address = "0xf60Dc951f51F22bC042483024d53D514C6145275";
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
 const contract = new ethers.Contract(contractAddress, abi, wallet);

@@ -15,7 +15,7 @@ const recordLoanEvents = async () => {
     // Fetch loan creation events from the last 100 blocks
     const loanCreatedEvents = await contract.queryFilter(
       contract.filters.LoanCreated(),
-      blockNumber - 1000,
+      blockNumber - 100,
     );
 
     console.log(`Found ${loanCreatedEvents.length} LoanCreated events`);
